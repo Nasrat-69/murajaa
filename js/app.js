@@ -159,6 +159,9 @@
     return `<div class="preps">${current ? `<span class="flabel">${esc('Avec ce verbe')}</span>` : flabel('prep')}
       ${ps.map(e => `<div class="pr ${current && AR.letters(e.p) === AR.letters(current) ? 'cur' : ''}">${ar(e.p, 'md')}<span class="pr-fr">${esc(e.fr)}</span>${e.ex ? `<span class="pr-ex">${ar(e.ex, 'sm')}</span>` : ''}</div>`).join('')}</div>`;
   }
+  // la question en clair, au centre : « Quel est le pluriel ? »
+  const ASKQ = { fr: 'Quelle est la traduction ?', pl: 'Quel est le pluriel ?', mud: 'Quel est le présent ?', amr: "Quel est l'impératif ?", masdar: 'Quel est le masdar ?', madi: 'Quel est le passé ?', w: 'Quel est le mot ?', ant: 'Quel est le contraire ?', syn: 'Quel est le synonyme ?', prep: 'Quelle préposition ?', blank: 'Quel mot manque ?', fem: 'Quel est le féminin ?' };
+  const askLabel = (f, given, small) => `<div class="qask ${small ? 'sm' : ''}"><b>${esc(f === 'w' && given === 'pl' ? 'Quel est le singulier ?' : (ASKQ[f] || F[f].fr))}</b>${ar(F[f].ar, 'sm')}</div>`;
   const prepHint = q => (q.to === 'prep' && q.item.prepFr ? `<div class="sub muted small">${esc('sens : ' + q.item.prepFr)}</div>` : '');
   function itemCard(it, compact = false, skip = []) {
     const cell = f => (it[f] && !skip.includes(f) ? `<div class="cell">${flabel(f)}${val(f, it[f], 'lg')}</div>` : '');
@@ -427,7 +430,7 @@
       const body = V.mode === 'qcm'
         ? `<div class="opts ${isAr ? 'ar-opts' : ''}">${q.options[f].map((o, k) => `<button class="opt ${a[f] === o ? 'sel' : ''}" data-a="ppick" data-q="${q.qid}" data-f="${f}" data-k="${k}">${val(f, o)}</button>`).join('')}</div>`
         : `<input class="pin ${isAr ? 'ar-input' : ''}" data-q="${q.qid}" data-f="${f}" dir="${isAr ? 'rtl' : 'ltr'}" lang="${isAr ? 'ar' : 'fr'}" value="${esc(a[f] || '')}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="${isAr ? 'اُكْتُبْ هُنَا…' : 'en français…'}">`;
-      return `<div class="phole">${q.hidden.length > 1 || q.given === 'exBlank' ? flabel(f) : ''}${body}</div>`;
+      return `<div class="phole">${askLabel(f, q.given, true)}${body}</div>`;
     }).join('');
     return `<div class="pq"><span class="pn">${n}</span><div class="pbody">${given}<div class="pholes ${q.hidden.length > 1 ? 'multi' : ''}">${holes}</div></div></div>`;
   }
@@ -541,7 +544,7 @@
       }
       const fbl = r ? `<div class="fbl ${r.ok ? 'ok' : 'ko'}">${r.ok ? ico('check') + ' Correct' : ico('x') + ' Réponse :'} ${!r.ok || mode === 'type' ? val(f, it[f], 'md') : ''}
         ${!r.ok && r.near ? `<small>${f === 'mud' && level === 'mudari' ? 'Lettres justes — vérifie la voyelle de la ʿayn' : 'Lettres justes, harakat à corriger'}</small>` : ''}</div>` : '';
-      return `<div class="hole ${r ? (r.ok ? 'is-ok' : 'is-ko') : ''}">${flabel(f)}${body}${fbl}</div>`;
+      return `<div class="hole ${r ? (r.ok ? 'is-ok' : 'is-ko') : ''}">${askLabel(f, q.given)}${body}${fbl}</div>`;
     };
     const allOk = fb && q.hidden.every(f => cur[f].ok);
     return `<div class="qcard ${fb ? (allOk ? 'pulse-ok' : 'shake') : ''}"><div class="given">${tag ? `<div class="qtag">${tag}</div>` : ''}${flabel(q.given)}<div class="gval">${val(q.given, it[q.given], 'xxl')}</div>
@@ -711,7 +714,7 @@
     const q = V.q;
     return `${gtop(comboTag())}
       <div class="qcard game-card ${V.fb ? (V.fb.ok ? 'pulse-ok' : 'shake') : 'card-in'}"><div class="given">${flabel(q.from)}<div class="gval">${val(q.from, q.item[q.from], 'xxl')}</div>${prepHint(q)}</div>
-        <div class="hole">${flabel(q.to)}<div class="opts ${F[q.to].isAr ? 'ar-opts' : ''}">${q.options.map((o, k) => {
+        <div class="hole">${askLabel(q.to, q.from)}<div class="opts ${F[q.to].isAr ? 'ar-opts' : ''}">${q.options.map((o, k) => {
           let cl = ''; if (V.fb) cl = o === q.answer ? 'good' : (V.fb.k === k ? 'bad' : 'dim');
           return `<button class="opt ${cl}" data-a="rushPick" data-k="${k}"><kbd>${k + 1}</kbd>${val(q.to, o)}</button>`;
         }).join('')}</div></div></div>`;
@@ -767,7 +770,7 @@
         <div class="ground"></div>
         ${fb && !fb.ok ? `<div class="rain-ans">${val(q.to, q.answer, 'lg')}</div>` : ''}
       </div>
-      <div class="hole">${flabel(q.to)}<div class="opts ${F[q.to].isAr ? 'ar-opts' : ''}">${q.options.map((o, k) => {
+      <div class="hole">${askLabel(q.to, q.from)}<div class="opts ${F[q.to].isAr ? 'ar-opts' : ''}">${q.options.map((o, k) => {
         let cl = ''; if (fb) cl = o === q.answer ? 'good' : (fb.k === k ? 'bad' : 'dim');
         return `<button class="opt ${cl}" data-a="rainPick" data-k="${k}"><kbd>${k + 1}</kbd>${val(q.to, o)}</button>`;
       }).join('')}</div></div>`;
@@ -794,7 +797,7 @@
     return `${sessionTop(V.round, V.total, `<span class="pts">${V.score} pts</span>`)}
       <div class="qcard ana ${fb ? (fb.ok ? 'pulse-ok' : 'shake') : 'card-in'}">
         <div class="given">${flabel(q.from)}<div class="gval">${val(q.from, q.item[q.from], 'xl')}</div></div>
-        <div class="ana-ask">${flabel(q.to)}</div>
+        <div class="ana-ask">${askLabel(q.to, q.from)}</div>
         <div class="built ${fb ? (fb.ok ? 'ok' : 'ko') : ''}" dir="rtl">${fb && fb.reveal ? ar(q.item[q.to], 'xxl') : (built ? ar(built, 'xxl') : '<span class="ph">…</span>')}</div>
         <div class="slots" dir="rtl">${slots}</div>
         <div class="tiles" dir="rtl">${q.tiles.map((t, i) => `<button class="tile ${V.built.includes(i) ? 'used' : ''}" data-a="tile" data-i="${i}" ${V.built.includes(i) || fb ? 'disabled' : ''}>${esc(t.ch)}</button>`).join('')}</div>

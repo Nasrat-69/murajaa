@@ -238,9 +238,67 @@ const Engine = (() => {
     if (cands.length < count) for (const g of ['w', 'syn', 'ant', 'pl', 'madi', 'masdar']) if (FIELDS[g].isAr === FIELDS[f].isAr) pool.forEach(o => push(o[g]));
     return shuffle(cands, rng).slice(0, count);
   }
+  /* ---- pièges sur la MÊME racine : خَرَجَ → يَخْرَجُ / يُخْرِجُ, خِرَاجًا / إِخْرَاجًا… ---- */
+  const FA = 'َ', DA = 'ُ', KA = 'ِ', SK = 'ْ', SH = 'ّ', TN = 'ً';
+  function rootOf(madi) {
+    const raw = AR.alts(madi)[0] || '', s = [...AR.strip(raw)], sh = raw.includes(SH);
+    let root = null, form = null;
+    if (s.length === 3) { root = s; form = sh ? 'II' : 'I'; }
+    else if (s.length === 4 && s[0] === 'أ') { root = s.slice(1); form = 'IV'; }
+    else if (s.length === 4 && s[0] === 'ت' && sh) { root = s.slice(1); form = 'V'; }
+    else if (s.length === 4 && s[1] === 'ا') { root = [s[0], s[2], s[3]]; form = 'III'; }
+    else if (s.length === 5 && /[اإ]/.test(s[0]) && s[2] === 'ت') { root = [s[1], s[3], s[4]]; form = 'VIII'; }
+    if (!root) return null;
+    // racines faibles ou avec hamza : les schémas générés seraient faux, on ne piège pas
+    if (root.some(c => /[ءأإآؤئ]/.test(c)) || /[اوىي]/.test(root[1] + root[2])) return null;
+    return { root, form };
+  }
+  function rootTraps(it, f) {
+    const r = rootOf(it.madi); if (!r) return [];
+    const [F, A, L] = r.root;
+    if (F === 'و' && (f === 'mud' || f === 'amr')) return [];   // وَصَلَ → يَصِلُ / صِلْ : schéma particulier
+    const P = {
+      madi: [F + FA + A + FA + L + FA, F + FA + A + KA + L + FA, F + FA + A + DA + L + FA, 'أَ' + F + SK + A + FA + L + FA, F + FA + A + SH + FA + L + FA, F + FA + 'ا' + A + FA + L + FA, 'تَ' + F + FA + A + SH + FA + L + FA, 'اِ' + F + SK + 'تَ' + A + FA + L + FA],
+      mud: ['يَ' + F + SK + A + FA + L + DA, 'يَ' + F + SK + A + KA + L + DA, 'يَ' + F + SK + A + DA + L + DA, 'يُ' + F + SK + A + KA + L + DA, 'يُ' + F + FA + A + SH + KA + L + DA, 'يُ' + F + FA + 'ا' + A + KA + L + DA, 'يَتَ' + F + FA + A + SH + FA + L + DA, 'يَ' + F + SK + 'تَ' + A + KA + L + DA],
+      amr: ['اُ' + F + SK + A + DA + L + SK, 'اِ' + F + SK + A + FA + L + SK, 'اِ' + F + SK + A + KA + L + SK, 'أَ' + F + SK + A + KA + L + SK, F + FA + A + SH + KA + L + SK, F + FA + 'ا' + A + KA + L + SK, 'تَ' + F + FA + A + SH + FA + L + SK, 'اِ' + F + SK + 'تَ' + A + KA + L + SK],
+      masdar: [F + FA + A + SK + L + TN + 'ا', F + DA + A + DA + 'و' + L + TN + 'ا', F + KA + A + FA + 'ا' + L + TN + 'ا', F + FA + A + FA + L + TN + 'ا', F + KA + A + SK + L + TN + 'ا', 'تَ' + F + SK + A + KA + 'ي' + L + TN + 'ا', 'إِ' + F + SK + A + FA + 'ا' + L + TN + 'ا', 'مُ' + F + FA + 'ا' + A + FA + L + FA + 'ةً', 'تَ' + F + FA + A + DA + SH + L + TN + 'ا', 'اِ' + F + SK + 'تِ' + A + FA + 'ا' + L + TN + 'ا']
+    }[f];
+    if (!P) return [];
+    // schéma اِفْتَعَلَ seulement pour les verbes de ce type (sinon orthographe fausse : اِدْتِخَال…)
+    if (r.form !== 'VIII') { const last = P.length - 1; P.splice(last, 1); }
+    const right = AR.alts(it[f]).map(x => AR.canon(x));
+    const seen = new Set(right);
+    // orthographe : « إِوْ » / « اِوْ » s'écrivent إِي… (إِيصَال), on ne les propose pas
+    return P.filter(x => { if (/^[إا]ِو/.test(x)) return false; const c = AR.canon(x); if (seen.has(c)) return false; seen.add(c); return true; });
+  }
+  // يَقُولُ → يَقِيلُ / يَقَالُ ; قُلْ → قِلْ / قَلْ : mêmes lettres, autres voyelles
+  function vowelTraps(word, field) {
+    if (field === 'masdar') return [];                  // masdar : changer les voyelles donnerait des fautes d'orthographe
+    const w = AR.alts(word)[0] || '';
+    const out = new Set(AR.ainVariants(w));
+    const cl = []; for (const ch of AR.clean(w)) { if (/[ً-ْ]/.test(ch) && cl.length) cl[cl.length - 1].m += ch; else cl.push({ c: ch, m: '' }); }
+    const LONG = { [FA]: 'ا', [DA]: 'و', [KA]: 'ي' };
+    cl.forEach((x, i) => {
+      const v = [FA, DA, KA].find(s => x.m.includes(s)), nx = cl[i + 1];
+      if (!v) return;
+      if (nx && LONG[v] === nx.c && !nx.m) {            // voyelle longue : on la remplace par une autre
+        for (const s of [FA, DA, KA]) if (s !== v) out.add(cl.map((y, j) => (j === i ? y.c + y.m.replace(v, s) : j === i + 1 ? LONG[s] : y.c + y.m)).join(''));
+      } else if (field === 'amr' && i <= 1 && cl.length <= 3 && !/[اأإآ]/.test(x.c)) {   // impératif court (قُلْ) : on change la voyelle
+        for (const s of [FA, DA, KA]) if (s !== v) out.add(cl.map((y, j) => (j === i ? y.c + y.m.replace(v, s) : y.c + y.m)).join(''));
+      }
+    });
+    const right = AR.canon(w);
+    return [...out].filter(x => AR.canon(x) !== right && !/^أِ/.test(x));   // « أِ » n'existe pas (on écrit إِ)
+  }
   function options(it, f, pool, rng = Math.random, k = 4) {
     let opts = [];
-    if (f === 'mud' && it.madi && AR.letters(AR.alts(it.madi)[0]).length === 3) {
+    // verbe : d'abord des pièges construits sur la même racine
+    if (it.t === 'verb' && ['madi', 'mud', 'amr', 'masdar'].includes(f)) {
+      let tr = rootTraps(it, f);
+      if (!tr.length) tr = vowelTraps(it[f], f);        // verbes faibles : on change les voyelles du même mot
+      opts = shuffle(tr, rng).slice(0, k - 1);
+    }
+    if (!opts.length && f === 'mud' && it.madi && AR.letters(AR.alts(it.madi)[0]).length === 3) {
       const v = AR.ainVariants(AR.alts(it.mud)[0] || it.mud);   // piège : autre voyelle de la ʿayn
       opts = shuffle(v, rng).slice(0, Math.min(k - 2, rng() < 0.5 ? 1 : 2));
     }
@@ -370,8 +428,9 @@ const Engine = (() => {
       const [a, b] = pr, truth = rng() < 0.5;
       let shown = it[b];
       if (!truth) {
-        const d = b === 'mud' && rng() < 0.5 ? AR.ainVariants(it.mud) : [];
-        shown = d.length ? d[0] : distractors(it, b, items, rng, 1)[0];
+        // faux mais crédible : même racine, autre schéma
+        const d = it.t === 'verb' && ['madi', 'mud', 'amr', 'masdar'].includes(b) && rng() < 0.85 ? rootTraps(it, b) : (b === 'mud' ? AR.ainVariants(it.mud) : []);
+        shown = d.length ? d[Math.floor(rng() * d.length)] : distractors(it, b, items, rng, 1)[0];
         if (!shown) return { item: it, from: a, to: b, shown: it[b], truth: true };
       }
       return { item: it, from: a, to: b, shown, truth };
@@ -410,7 +469,7 @@ const Engine = (() => {
   return {
     FIELDS, TYPES, CATS, KINDS, PAIRS, CENTERS, SECTIONS, HURUF, build, get LIB() { return LIB; }, head, headF, examFields, itemsFor,
     parsePreps, expandPreps, spec, cards, catCount, srsQueue, srsStats, selectCards, countWhich, mastery, lessonMastery, enemies,
-    rng32, shuffle, bag, options, makeExam, qsFromCards, blankOf, sectionCount, makePaper,
+    rng32, shuffle, bag, options, rootTraps, makeExam, qsFromCards, blankOf, sectionCount, makePaper,
     pairsFor, playable, gameQ, tfQ, anagramQ, enc, dec
   };
 })();

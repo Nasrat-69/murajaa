@@ -1,6 +1,11 @@
 /* Traductions de l'interface : [français, anglais, russe]. {n} = un nombre. */
 (() => {
   const T = [
+    ["Quelle est la traduction ?", "What's the translation?", "Какой перевод?"], ["Quel est le pluriel ?", "What's the plural?", "Какое множественное число?"],
+    ["Quel est le présent ?", "What's the present?", "Какое настоящее время?"], ["Quel est l'impératif ?", "What's the imperative?", "Какое повелительное наклонение?"],
+    ["Quel est le masdar ?", "What's the masdar?", "Какой масдар?"], ["Quel est le passé ?", "What's the past?", "Какое прошедшее время?"], ["Quel est le mot ?", "What's the word?", "Какое слово?"],
+    ["Quel est le singulier ?", "What's the singular?", "Какое единственное число?"], ["Quel est le contraire ?", "What's the opposite?", "Какой антоним?"], ["Quel est le synonyme ?", "What's the synonym?", "Какой синоним?"],
+    ["Quelle préposition ?", "Which preposition?", "Какой предлог?"], ["Quel mot manque ?", "Which word is missing?", "Какое слово пропущено?"], ["Quel est le féminin ?", "What's the feminine?", "Какой женский род?"],
     ["Ordre des mots", "Word order", "Порядок слов"], ["Ordre des questions", "Question order", "Порядок вопросов"],
     ["Plusieurs prépositions", "Several prepositions", "Несколько предлогов"],
     ["Règles : l'arabe d'abord, puis le signe = et la traduction. Les formes d'un verbe sont séparées par /. Le pluriel va entre ( ). Les infos en plus se mettent après |. Tu peux aussi coller des colonnes depuis Excel ou Google Sheets.",
