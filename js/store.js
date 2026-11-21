@@ -4,11 +4,12 @@ const Store = (() => {
   const MIN = 60000, DAY = 86400000;
   const defaults = () => ({
     v: 1, name: '',
-    settings: { harakat: 'none', newPerDay: 20, theme: 'auto', osk: false,
-      kinds: { arfr: true, frar: true, forms: true, plural: true } },
+    settings: { harakat: 'none', newPerDay: 20, theme: 'auto', osk: false, sound: true, goal: 60 },
     exam: { n: 15, mode: 'qcm', boss: false },
+    rev: { mode: 'srs', dir: 'both', n: 20, what: { tr: true, conj: true, pl: true, ant: false, syn: false } },
+    game: { what: { tr: true, conj: true, pl: true, ant: true, syn: true } },
     sel: [], cards: {}, items: {}, edits: {}, hidden: {}, custom: {}, decks: [],
-    xp: 0, days: {}, best: { rush: 0, match: 0 }, newLog: {}, duels: []
+    xp: 0, days: {}, best: { rush: 0, tf: 0, rain: 0, anagram: 0 }, newLog: {}, duels: []
   });
   let S = defaults();
 
@@ -18,8 +19,11 @@ const Store = (() => {
       const d = defaults();
       S = Object.assign(d, raw);
       S.settings = Object.assign(d.settings, raw.settings || {});
-      S.settings.kinds = Object.assign(defaults().settings.kinds, (raw.settings || {}).kinds || {});
+      delete S.settings.kinds;
       S.exam = Object.assign(defaults().exam, raw.exam || {});
+      S.rev = Object.assign(defaults().rev, raw.rev || {});
+      S.rev.what = Object.assign(defaults().rev.what, (raw.rev || {}).what || {});
+      S.game = { what: Object.assign(defaults().game.what, ((raw.game || {}).what) || {}) };
       S.best = Object.assign(defaults().best, raw.best || {});
     } catch (e) { S = defaults(); }
   }
