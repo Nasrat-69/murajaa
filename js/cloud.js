@@ -129,12 +129,40 @@ const Cloud = (() => {
   const rematch = (c, settings) => room(c).get().then(s => {
     const d = s.data(); const players = {};
     for (const [k, p] of Object.entries(d.players)) players[k] = Object.assign({}, p, { score: 0, ans: {} });
-    return room(c).update({ state: 'lobby', qi: -1, settings, players });
+    return room(c).update({ state: 'lobby', qi: -1, settings, players, paused: null });
   });
+  // passe à la question suivante une seule fois, même si les deux cliquent en même temps
+  const advanceFrom = (c, fromQi, n) => db.runTransaction(async tx => {
+    const ref = room(c), s = await tx.get(ref);
+    if (!s.exists || s.data().qi !== fromQi || s.data().state !== 'playing') return;
+    tx.update(ref, fromQi + 1 >= n ? { state: 'done', qi: fromQi + 1, paused: null } : { qi: fromQi + 1, qAt: Date.now(), paused: null });
+  });
+  const pause = (c, qi, left) => room(c).update({ paused: { by: uid(), qi, left: Math.max(0, Math.round(left)) } });
+  const resume = c => room(c).update({ paused: null });
+  // appel vocal / vidéo (WebRTC, signalisation dans Firestore)
+  const setCall = (c, info) => room(c).update({ ['call.' + uid()]: info ? info : FV().delete() });
+  const rtc = c => room(c).collection('rtc').doc('main');
+  const arrayUnion = v => FV().arrayUnion(v);
+  /* ---- partage d'une page de mots par code ---- */
+  async function share(payload) {
+    for (let i = 0; i < 5; i++) {
+      const c = newCode(), ref = db.doc('shared/' + c);
+      if ((await ref.get()).exists) continue;
+      await ref.set({ by: uid(), at: Date.now(), json: JSON.stringify(payload) });
+      return c;
+    }
+    throw new Error('Impossible de créer le code');
+  }
+  async function getShared(c) {
+    const s = await db.doc('shared/' + String(c || '').trim().toUpperCase()).get();
+    if (!s.exists) throw new Error('Code introuvable');
+    return JSON.parse(s.data().json);
+  }
 
   return {
     st, init, signIn, signOut, pull, pushNow, profiles, uid,
     createRoom, joinRoom, watchRoom, updateSettings, startRoom, advance, answer, leaveRoom, rematch,
+    advanceFrom, pause, resume, setCall, rtc, arrayUnion, share, getShared,
     on: f => { subs.add(f); return () => subs.delete(f); }
   };
 })();

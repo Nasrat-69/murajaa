@@ -7,9 +7,11 @@ const Store = (() => {
     v: 1, name: '', updatedAt: 0, center: 'ibaanah',
     settings: { harakat: 'none', newPerDay: 20, theme: 'auto', osk: false, sound: true, goal: 60 },
     exam: { n: 15, mode: 'qcm', boss: false },
-    rev: { mode: 'srs', dir: 'both', n: 20, what: { tr: true, conj: true, pl: true, ant: false, syn: false } },
-    game: { what: { tr: true, conj: true, pl: true, ant: true, syn: true } },
-    live: { n: 10, mode: 'qcm', time: 30 },
+    rev: { mode: 'flip', which: 'due', order: 'random', dir: 'both', n: 20, what: { tr: true, conj: true, pl: true, ant: false, syn: false, prep: false } },
+    game: { what: { tr: true, conj: true, pl: true, ant: true, syn: true, prep: true }, dur: 15, choices: 4, n: 10, speed: 'normal' },
+    live: { n: 10, mode: 'qcm', time: 30, adv: 'auto' },
+    paper: { sections: ['tr', 'conj', 'pl', 'antsyn', 'prep', 'sent'], size: 8, mode: 'type', timer: 0 },
+    exams: [],
     sel: [], cards: {}, items: {}, edits: {}, hidden: {}, custom: {}, decks: [],
     xp: 0, days: {}, best: { rush: 0, tf: 0, rain: 0, anagram: 0 }, newLog: {}, duels: [],
     rivals: {}, liveDone: []
@@ -25,8 +27,13 @@ const Store = (() => {
     s.exam = Object.assign(defaults().exam, (raw || {}).exam || {});
     s.rev = Object.assign(defaults().rev, (raw || {}).rev || {});
     s.rev.what = Object.assign(defaults().rev.what, ((raw || {}).rev || {}).what || {});
-    s.game = { what: Object.assign(defaults().game.what, (((raw || {}).game || {}).what) || {}) };
+    if (s.rev.mode === 'srs') { s.rev.mode = 'flip'; s.rev.which = 'due'; }
+    const g = (raw || {}).game || {};
+    s.game = Object.assign(defaults().game, g, { what: Object.assign(defaults().game.what, g.what || {}) });
+    if (!g.v2) { if (s.game.dur === 60) s.game.dur = 15; s.game.v2 = true; }
     s.live = Object.assign(defaults().live, (raw || {}).live || {});
+    s.paper = Object.assign(defaults().paper, (raw || {}).paper || {});
+    s.exams = (raw || {}).exams || [];
     s.best = Object.assign(defaults().best, (raw || {}).best || {});
     delete s.best.match;
     return s;
@@ -56,6 +63,8 @@ const Store = (() => {
     for (const [k, v] of Object.entries(older.best || {})) m.best[k] = Math.max(m.best[k] || 0, v || 0);
     for (const [k, v] of Object.entries(older.rivals || {})) if (!m.rivals[k] || (v.at || 0) > (m.rivals[k].at || 0)) m.rivals[k] = v;
     m.liveDone = [...new Set([...(m.liveDone || []), ...(older.liveDone || [])])].slice(-200);
+    const ex = {}; [...(older.exams || []), ...(m.exams || [])].forEach(e => { ex[e.at] = e; });
+    m.exams = Object.values(ex).sort((a, b) => a.at - b.at).slice(-100);
     m.xp = Math.max(a.xp || 0, b.xp || 0);
     m.name = m.name || older.name;
     m.updatedAt = Math.max(a.updatedAt || 0, b.updatedAt || 0);

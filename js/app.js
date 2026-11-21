@@ -3,7 +3,7 @@
   'use strict';
   const S = () => Store.S;
   const F = Engine.FIELDS, T = Engine.TYPES, CATS = Engine.CATS;
-  const CAT_ICON = { tr: 'globe', conj: 'repeat', pl: 'plural', ant: 'swap', syn: 'equal' };
+  const CAT_ICON = { tr: 'globe', conj: 'repeat', pl: 'plural', ant: 'swap', syn: 'equal', prep: 'link' };
   const app = document.getElementById('app');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ar = (s, cls = '') => (s ? `<span class="ar ${cls}" lang="ar" dir="rtl">${esc(s)}</span>` : '');
@@ -23,7 +23,8 @@
   function stopTimers() { if (timer) { clearInterval(timer); timer = null; } timeouts.forEach(clearTimeout); timeouts = []; }
   function unwatch() { if (liveUnsub) { liveUnsub(); liveUnsub = null; } }
   function go(name, p = {}) {
-    if (V.name === 'live' && name !== 'live') { Cloud.leaveRoom(V.code, V.room); unwatch(); }
+    if (V.name === 'live' && name !== 'live') { Call.detach(); Cloud.leaveRoom(V.code, V.room); unwatch(); }
+    if (V.name === 'paper' && !V.done && name !== 'paper' && V.answered && V.answered() > 0 && !confirm('Quitter l\'examen ? Tes réponses seront perdues.')) return;
     stopTimers(); V = Object.assign({ name }, p); render(); window.scrollTo(0, 0);
   }
   function rebuild() { LIB = Engine.build(); }
@@ -79,7 +80,7 @@
   }
 
   /* ---------- rendu ---------- */
-  const SESSION = ['flash', 'exam', 'rush', 'tf', 'rain', 'anagram', 'live'];
+  const SESSION = ['flash', 'exam', 'paper', 'rush', 'tf', 'rain', 'anagram', 'live'];
   const NAV = [['home', 'home', 'Accueil'], ['reviewSetup', 'cards', 'Réviser'], ['examSetup', 'exam', 'Examen'], ['games', 'game', 'Jeux'], ['words', 'book', 'Mots']];
   function render() {
     // garde ce qui est en cours de saisie (utile quand l'adversaire répond pendant qu'on écrit)
@@ -94,7 +95,7 @@
     OSK.refresh();
     if (V.name === 'flash') bindSwipe();
   }
-  function navCur() { return { duel: 'games', gameSetup: 'games', stats: 'home', account: 'home' }[V.name] || V.name; }
+  function navCur() { return { duel: 'games', gameSetup: 'games', stats: 'home', account: 'home', import: 'words' }[V.name] || V.name; }
   function header() {
     const L = Store.level(), u = Cloud.st.user;
     return `<header class="top"><div class="top-in">
@@ -163,7 +164,7 @@
   const VIEWS = {};
 
   VIEWS.home = () => {
-    const L = Store.level(), xp = todayXP(), goal = S().settings.goal, pct = Math.min(1, xp / goal);
+    const xp = todayXP(), goal = S().settings.goal, pct = Math.min(1, xp / goal);
     const cards = Engine.cards(Engine.itemsFor(sel()), S().rev), st = Engine.srsStats(cards);
     const en = Engine.enemies(10).filter(it => centerDecks().some(d => d.id === it.deckId));
     const decks = centerDecks();
@@ -172,6 +173,11 @@
       <div class="greet"><div><p class="ar salam">السَّلَامُ عَلَيْكُمْ</p><h1>${hello}</h1></div>
         <button class="cchip" data-a="go" data-to="account" data-tip="Changer de centre">${ico('building')}${esc(center().name)}</button></div>
       ${!S().name ? `<div class="panel namecard"><p class="muted small">Ton prénom (visible par ton binôme en duel) :</p><div class="row"><input id="nameIn" placeholder="Prénom" maxlength="20"><button class="btn primary" data-a="saveName">OK</button></div></div>` : ''}
+      <section class="livehero">
+        <div class="lh-top"><span class="lh-ic">${ico('live')}</span><div><b>Duel en direct</b><small>Révise avec ton binôme en même temps, avec le salon vocal intégré.</small></div></div>
+        <div class="lh-a"><button class="btn primary" data-a="homeLiveCreate">${ico('plus')}Créer une salle</button>
+          <div class="lh-join"><input id="homeCode" class="codein sm" placeholder="CODE" maxlength="5" autocapitalize="characters"><button class="btn" data-a="homeLiveJoin">Rejoindre</button></div></div>
+      </section>
       <section class="today">
         <div class="ring" style="--p:${pct}" data-tip="Objectif du jour : ${goal} XP"><div><b>${xp}</b><small>/ ${goal} XP</small></div></div>
         <div class="today-r">
@@ -180,27 +186,26 @@
             <div><b>${st.due}</b><small>à revoir</small></div>
             <div><b>${st.newAvail}</b><small>nouvelles</small></div>
           </div>
-          <div class="row wrap"><button class="btn primary" data-a="quickReview" ${decks.length ? '' : 'disabled'}>Réviser maintenant ${ico('arrow')}</button>
+          <div class="row wrap"><button class="btn primary" data-a="quickReview" ${decks.length ? '' : 'disabled'}>Programme du jour ${ico('arrow')}</button>
           <button class="btn ghost" data-a="go" data-to="stats">${ico('chart')}Statistiques</button></div>
         </div>
       </section>
 
-      <h2 class="sec">Modes de révision</h2>
+      <h2 class="sec">Réviser</h2>
       <div class="quick">
-        ${[['srs', 'repeat', 'Répétition', 'espacée'], ['cram', 'zap', 'Cartes', 'rapides'], ['write', 'pen', 'Écrire', 'la réponse'], ['qcm', 'choice', 'QCM', '4 choix']].map(([m, i, a, b]) =>
+        ${[['flip', 'cards', 'Cartes', 'à retourner'], ['cram', 'zap', 'Je sais /', 'je ne sais pas'], ['write', 'pen', 'Écrire', 'la réponse'], ['qcm', 'choice', 'QCM', '4 choix']].map(([m, i, a, b]) =>
           `<button class="qbtn" data-a="quickMode" data-v="${m}"><span class="qi">${ico(i)}</span><b>${a}</b><small>${b}</small></button>`).join('')}
-        <button class="qbtn" data-a="go" data-to="examSetup"><span class="qi">${ico('exam')}</span><b>Examen</b><small>à trous</small></button>
+        <button class="qbtn" data-a="go" data-to="examSetup"><span class="qi">${ico('exam')}</span><b>Examen</b><small>blanc</small></button>
       </div>
 
       <h2 class="sec">Jeux <button class="link" data-a="go" data-to="games">Tout voir</button></h2>
-      <div class="hscroll">${Object.entries(GAMES).map(([k, g]) => gameCard(k, g, true)).join('')}
-        <button class="gcard small" style="--c:var(--c-live)" data-a="go" data-to="duel"><span class="gi">${ico('live')}</span><b>Duel en direct</b><span class="best">2 joueurs</span></button></div>
+      <div class="hscroll">${Object.entries(GAMES).map(([k, g]) => gameCard(k, g, true)).join('')}</div>
 
       ${en.length ? `<section class="panel"><div class="row between"><h2>${ico('target', 'red')} Mots difficiles</h2><button class="btn sm" data-a="fightEnemies">S'entraîner</button></div>
         <p class="muted small">Les mots que tu rates le plus souvent.</p>
         <div class="chips">${en.map(it => `<span class="chip">${ar(Engine.head(it), 'sm')}</span>`).join('')}</div></section>` : ''}
 
-      <h2 class="sec">${esc(center().name)} · tes niveaux</h2>
+      <h2 class="sec">${esc(center().name)} · tes niveaux <button class="link" data-a="go" data-to="import">${ico('plus')}Ajouter des mots</button></h2>
       ${decks.length ? `<div class="decks">${decks.map(d => {
         const items = d.lessons.flatMap(l => l.items);
         const m = items.length ? items.reduce((a, it) => a + Engine.mastery(it), 0) / items.length : 0;
@@ -208,41 +213,48 @@
           <small class="muted">${esc(d.subtitle || '')} · ${d.lessons.length} pages · ${items.length} mots</small>${bar(m)}
           <div class="row wrap"><button class="btn sm primary" data-a="reviseDeck" data-id="${esc(d.id)}">Réviser ce niveau</button><button class="btn sm ghost" data-a="go" data-to="words">Voir les mots</button></div></div>`;
       }).join('')}
-        ${S().center === 'ibaanah' ? `<div class="dcard soon"><b>Mustawa 1 à 7</b><small class="muted">Envoie les photos de ton livre pour les ajouter.</small></div>` : ''}</div>` : emptyCenter()}`;
+        <button class="dcard soon" data-a="go" data-to="import"><b>${ico('plus')} Ajouter un niveau ou une page</b><small class="muted">Colle simplement ta liste de mots, une ligne par mot.</small></button></div>` : emptyCenter()}`;
   };
 
   /* ----- Réviser : réglages ----- */
-  const MODES = [['srs', 'repeat', 'Répétition espacée', 'Chaque mot revient au bon moment, comme Anki'], ['cram', 'zap', 'Cartes rapides', 'Je sais / je ne sais pas, glisse les cartes'], ['write', 'pen', 'Écrire', 'Tape la réponse au clavier'], ['qcm', 'choice', 'QCM', 'Choisis parmi 4 propositions']];
+  const MODES = [
+    ['flip', 'cards', 'Cartes à retourner', 'Tu retournes la carte puis tu dis si tu savais. L\'appli s\'en sert pour te la reproposer au bon moment.'],
+    ['cram', 'zap', 'Je sais / je ne sais pas', 'Glisse la carte à droite si tu sais, à gauche sinon. Elle revient jusqu\'à ce que tu la saches.'],
+    ['write', 'pen', 'Écrire', 'Tape la réponse au clavier, la correction est automatique.'],
+    ['qcm', 'choice', 'QCM', 'Choisis la bonne réponse parmi 4 propositions.']];
+  const WHICH = [
+    ['due', 'Programme du jour', 'L\'appli choisit : les mots que tu es en train d\'oublier + quelques nouveaux.'],
+    ['all', 'Tous les mots', 'Toute ta sélection, sans exception.'],
+    ['new', 'Jamais vus', 'Ceux que tu n\'as encore jamais révisés.'],
+    ['hard', 'Mots difficiles', 'Ceux où tu as déjà fait des erreurs.'],
+    ['weak', 'En cours', 'Déjà vus mais pas encore bien retenus.'],
+    ['known', 'Déjà maîtrisés', 'Pour vérifier qu\'ils sont toujours là.']];
   VIEWS.reviewSetup = () => {
     const r = S().rev, items = Engine.itemsFor(sel()), cards = Engine.cards(items, r);
-    const st = Engine.srsStats(cards);
-    const n = r.n === 'all' ? cards.length : Math.min(cards.length, r.n);
-    return `<div class="page-h"><h1>Réviser</h1><p class="muted">Choisis le centre, le niveau, les pages, le type de question, le sens et le mode.</p></div>
-      <section class="panel"><h2 class="step"><i>1</i>Quoi réviser ?</h2>${picker()}</section>
+    const cnt = Engine.countWhich(cards), avail = cnt[r.which] || 0;
+    const n = r.which === 'due' || r.n === 'all' ? avail : Math.min(avail, r.n);
+    return `<div class="page-h"><h1>Réviser</h1><p class="muted">Tu choisis tout : les pages, le type de question, les cartes et la façon de réviser.</p></div>
+      <section class="panel"><h2 class="step"><i>1</i>Quelles pages ?</h2>${picker()}</section>
       <section class="panel"><h2 class="step"><i>2</i>Type de question</h2>${whatChips(r.what, 'revWhat')}
         <h3>Sens</h3>${seg('revOpt', 'dir', [['ar', 'Arabe → Français'], ['fr', 'Français → Arabe'], ['both', 'Les deux']], r.dir)}
         <p class="muted small">Pour le pluriel, les contraires et les synonymes : « Arabe → Français » va du mot vers sa forme, l'autre sens fait l'inverse.</p></section>
-      <section class="panel"><h2 class="step"><i>3</i>Mode</h2>
-        <div class="modes">${MODES.map(([k, i, t, d]) => `<button class="mode ${r.mode === k ? 'on' : ''}" data-a="revOpt" data-k="mode" data-v="${k}"><span class="mi">${ico(i)}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div>
-        ${r.mode !== 'srs' ? `<h3>Nombre de cartes</h3>${seg('revOpt', 'n', [[10, '10'], [20, '20'], [40, '40'], ['all', 'Toutes']], r.n)}` : ''}</section>
-      <div class="cta-bar"><div class="cta-info">${r.mode === 'srs'
-        ? `<b>${st.due}</b> à revoir · <b>${st.newAvail}</b> nouvelles<small>sur ${cards.length} cartes</small>`
-        : `<b>${n}</b> cartes<small>sur ${cards.length}</small>`}</div>
-        <button class="btn primary lg" data-a="startRevision" ${cards.length ? '' : 'disabled'}>Commencer</button></div>`;
+      <section class="panel"><h2 class="step"><i>3</i>Quelles cartes ?</h2>
+        <div class="which">${WHICH.map(([k, t, d]) => `<button class="wh ${r.which === k ? 'on' : ''} ${cnt[k] ? '' : 'empty'}" data-a="revOpt" data-k="which" data-v="${k}"><b>${t}</b><span class="whn">${cnt[k]}</span><small>${d}</small></button>`).join('')}</div>
+        ${r.which !== 'due' ? `<h3>Ordre</h3>${seg('revOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], r.order)}
+          <h3>Nombre de cartes</h3>${seg('revOpt', 'n', [[10, '10'], [20, '20'], [40, '40'], ['all', 'Toutes']], r.n)}` : ''}</section>
+      <section class="panel"><h2 class="step"><i>4</i>Comment ?</h2>
+        <div class="modes">${MODES.map(([k, i, t, d]) => `<button class="mode ${r.mode === k ? 'on' : ''}" data-a="revOpt" data-k="mode" data-v="${k}"><span class="mi">${ico(i)}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div></section>
+      <div class="cta-bar"><div class="cta-info"><b>${n}</b> carte${n > 1 ? 's' : ''}<small>${esc(WHICH.find(w => w[0] === r.which)[1])} · ${cards.length} au total</small></div>
+        <button class="btn primary lg" data-a="startRevision" ${n ? '' : 'disabled'}>Commencer</button></div>`;
   };
 
   function startRevision() {
     const r = S().rev, cards = Engine.cards(Engine.itemsFor(sel()), r);
-    if (!cards.length) { toast('Aucune carte pour cette sélection'); return; }
-    if (r.mode === 'srs') {
-      const q = Engine.srsQueue(cards);
-      if (!q.length) { toast('Rien à revoir pour l\'instant. Essaie les cartes rapides ou un jeu.', 3500); return; }
-      go('flash', { mode: 'srs', q, i: 0, flip: false, n: 0, xp: 0, total: q.length });
-      return;
-    }
-    let list = Engine.shuffle(cards.slice());
-    if (r.n !== 'all') list = list.slice(0, r.n);
-    if (r.mode === 'cram') go('flash', { mode: 'cram', q: list, i: 0, flip: false, n: 0, xp: 0, total: list.length, known: 0, unknown: 0, seen: {} });
+    let list = Engine.selectCards(cards, r.which);
+    if (!list.length) { toast(r.which === 'due' ? 'Rien à revoir aujourd\'hui. Choisis « Tous les mots » ou un autre groupe.' : 'Aucune carte dans ce groupe.', 3800); return; }
+    if (r.which !== 'due') { if (r.order !== 'book') list = Engine.shuffle(list); if (r.n !== 'all') list = list.slice(0, r.n); }
+    if (r.mode === 'flip') go('flash', { mode: 'srs', q: list, i: 0, flip: false, n: 0, xp: 0, total: list.length });
+    else if (r.mode === 'cram') go('flash', { mode: 'cram', q: list, i: 0, flip: false, n: 0, xp: 0, total: list.length, known: 0, unknown: 0, seen: {} });
     else startExamQs(Engine.qsFromCards(list), { mode: r.mode === 'write' ? 'type' : 'qcm', title: r.mode === 'write' ? 'Écrire' : 'QCM', review: true });
   }
 
@@ -253,6 +265,7 @@
       let h = c.p.map(f => `<div class="pv">${val(f, it[f], F[f].isAr ? 'xxl' : 'xl')}</div>`).join('');
       if (c.kind === 'arfr' && it.t === 'verb' && it.mud) h += `<div class="sub">${ar(it.mud, 'md')}</div>`;
       if (c.kind === 'frar') h += `<div class="sub muted">${esc(T[it.t] ? T[it.t].label : '')}</div>`;
+      if (/^prep/.test(c.kind)) h += `<div class="sub muted">${it.prepFr ? 'sens : ' + esc(it.prepFr) : esc(it.fr || '')}</div>`;
       return h + `<div class="ask">${c.a.map(f => esc(F[f].fr)).join(' · ')} ?</div>`;
     }
     return `<div class="ans">${c.a.map(f => `<div class="av2">${flabel(f)}${val(f, it[f], 'xl')}</div>`).join('')}</div>${itemCard(it, true, c.a)}`;
@@ -337,19 +350,145 @@
     fc.addEventListener('pointerup', end); fc.addEventListener('pointercancel', end);
   }
 
-  /* ----- Examen ----- */
+  /* ----- Examen blanc : une vraie copie en plusieurs parties ----- */
+  const SEC_ICON = { tr: 'globe', conj: 'repeat', pl: 'plural', antsyn: 'swap', prep: 'link', sent: 'book' };
+  const SEC_CATS = { tr: { tr: true }, conj: { conj: true }, pl: { pl: true }, antsyn: { ant: true, syn: true }, prep: { prep: true }, sent: { tr: true } };
+  const lvlName = () => ({ none: 'souple (lettres seulement)', mudari: 'voyelle du muḍāriʿ exigée', strict: 'toutes les harakat' }[S().settings.harakat]);
+  const fmtNote = n => (Math.round(n * 2) / 2).toLocaleString('fr-FR');
+  const mention = n => (n >= 16 ? 'Excellent' : n >= 14 ? 'Très bien' : n >= 12 ? 'Bien' : n >= 10 ? 'Assez bien' : 'À retravailler');
+  function examHistory(list) {
+    if (!list.length) return '';
+    return `<div class="hist">${list.map(e => `<div class="hrow" data-tip="${new Date(e.at).toLocaleDateString('fr-FR')} : ${fmtNote(e.note)}/20">
+      <span class="muted small">${new Date(e.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+      <span class="bar"><b style="width:${e.note / 20 * 100}%"></b></span><b>${fmtNote(e.note)}/20</b></div>`).join('')}</div>`;
+  }
   VIEWS.examSetup = () => {
-    const e = S().exam;
-    const lvl = { none: 'souple (lettres seulement)', mudari: 'voyelle du muḍāriʿ exigée', strict: 'toutes les harakat' }[S().settings.harakat];
-    return `<div class="page-h"><h1>Examen à trous</h1><p class="muted">Une forme est donnée (passé, masdar, traduction…) : retrouve toutes les autres.</p></div>
-      <section class="panel"><h2 class="step"><i>1</i>Quoi réviser ?</h2>${picker()}</section>
-      <section class="panel"><h2 class="step"><i>2</i>Réglages</h2>
-        <h3>Nombre de questions</h3>${seg('examOpt', 'n', [[10, '10'], [15, '15'], [25, '25'], ['all', 'Tout']], e.n)}
-        <h3>Réponses</h3>${seg('examOpt', 'mode', [['qcm', 'Choix multiples'], ['type', 'Écrire']], e.mode)}
-        <p class="muted small">${e.mode === 'type' ? `Correction des harakat : <b>${lvl}</b> — <button class="link" data-a="go" data-to="settings">modifier</button>` : 'Les choix contiennent des pièges sur la voyelle du muḍāriʿ.'}</p>
-        <h3>Mode boss</h3>${seg('examOpt', 'boss', [[false, 'Normal'], [true, '3 vies seulement']], e.boss)}</section>
-      <div class="cta-bar"><div class="cta-info"><b>${Engine.itemsFor(sel()).length}</b> mots</div><button class="btn primary lg" data-a="startExam" ${Engine.itemsFor(sel()).length ? '' : 'disabled'}>Commencer</button></div>`;
+    const p = S().paper, items = Engine.itemsFor(sel());
+    const hist = S().exams.filter(e => e.center === S().center).slice(-6).reverse();
+    const per = p.size === 'all' ? 25 : p.size;
+    const total = p.sections.reduce((a, k) => a + Math.min(Engine.sectionCount(k, items), per), 0);
+    return `<div class="page-h"><h1>Examen blanc</h1><p class="muted">Comme le jour de l'examen : une copie en plusieurs parties, sans aide ni correction pendant l'épreuve. À la fin, tu as ta note, la correction détaillée et un plan de révision.</p></div>
+      <section class="panel"><h2 class="step"><i>1</i>Sur quelles pages ?</h2>${picker()}</section>
+      <section class="panel"><h2 class="step"><i>2</i>Parties de l'examen</h2>
+        <div class="wchips">${Object.entries(Engine.SECTIONS).map(([k, s]) => {
+          const n = Engine.sectionCount(k, items), on = p.sections.includes(k);
+          return `<button class="wchip ${on ? 'on' : ''} ${n ? '' : 'empty'}" data-a="paperSec" data-k="${k}">${ico(SEC_ICON[k])}<b>${s.title}</b><small>${n} mot${n > 1 ? 's' : ''}</small><i class="tick">${ico('check')}</i></button>`;
+        }).join('')}</div></section>
+      <section class="panel"><h2 class="step"><i>3</i>Réglages</h2>
+        <h3>Longueur</h3>${seg('paperOpt', 'size', [[4, 'Courte'], [8, 'Normale'], [15, 'Longue'], ['all', 'Complète']], p.size)}
+        <p class="muted small">Courte : 4 questions par partie · Normale : 8 · Longue : 15 · Complète : tous les mots.</p>
+        <h3>Réponses</h3>${seg('paperOpt', 'mode', [['type', 'À écrire'], ['qcm', 'Choix multiples']], p.mode)}
+        <h3>Temps limite</h3>${seg('paperOpt', 'timer', [[0, 'Sans'], [10, '10 min'], [20, '20 min'], [30, '30 min'], [45, '45 min']], p.timer)}
+        ${p.mode === 'type' ? `<p class="muted small">Correction des harakat : <b>${lvlName()}</b> — <button class="link" data-a="go" data-to="settings">modifier</button></p>` : ''}</section>
+      ${hist.length ? `<section class="panel"><h2>${ico('chart')} Tes derniers examens</h2>${examHistory(hist)}</section>` : ''}
+      <div class="cta-bar"><div class="cta-info"><b>${total}</b> questions<small>${p.sections.length} partie${p.sections.length > 1 ? 's' : ''}${p.timer ? ' · ' + p.timer + ' min' : ''}</small></div>
+        <button class="btn primary lg" data-a="startPaper" ${total ? '' : 'disabled'}>Commencer</button></div>`;
   };
+  function startPaper(items, opts = {}) {
+    const p = S().paper;
+    const secs = Engine.makePaper(items || Engine.itemsFor(sel()), { sections: opts.sections || p.sections, size: opts.size || p.size });
+    if (!secs.length) { toast('Pas assez de mots pour ces parties.'); return; }
+    const answered = () => Object.keys(V.ans).filter(q => Object.values(V.ans[q]).some(v => v)).length;
+    go('paper', { secs, si: 0, ans: {}, answered, mode: opts.mode || p.mode, level: S().settings.harakat, t0: Date.now(), limit: (opts.timer ?? p.timer) * 60000, done: false });
+    if (V.limit) timer = setInterval(paperTick, 1000);
+  }
+  function paperTick() {
+    const left = V.limit - (Date.now() - V.t0);
+    const el = document.getElementById('pt'); if (el) { el.textContent = fmtClock(left); el.classList.toggle('hurry', left < 60000); }
+    if (left <= 0) { stopTimers(); toast('Temps écoulé : ta copie est ramassée', 3500); submitPaper(true); }
+  }
+  const fmtClock = ms => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  function paperQ(q, n) {
+    const it = q.item, a = V.ans[q.qid] || {};
+    const given = q.given === 'exBlank'
+      ? `<div class="psent">${ar(it.exBlank, 'md')}</div>`
+      : `<div class="pgiven">${flabel(q.given)}${val(q.given, it[q.given], 'lg')}${q.sec === 'prep' && it.prepFr ? `<small class="muted">sens : ${esc(it.prepFr)}</small>` : ''}</div>`;
+    const holes = q.hidden.map(f => {
+      const isAr = F[f].isAr;
+      const body = V.mode === 'qcm'
+        ? `<div class="opts ${isAr ? 'ar-opts' : ''}">${q.options[f].map((o, k) => `<button class="opt ${a[f] === o ? 'sel' : ''}" data-a="ppick" data-q="${q.qid}" data-f="${f}" data-k="${k}">${val(f, o)}</button>`).join('')}</div>`
+        : `<input class="pin ${isAr ? 'ar-input' : ''}" data-q="${q.qid}" data-f="${f}" dir="${isAr ? 'rtl' : 'ltr'}" lang="${isAr ? 'ar' : 'fr'}" value="${esc(a[f] || '')}" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="${isAr ? 'اُكْتُبْ هُنَا…' : 'en français…'}">`;
+      return `<div class="phole">${q.hidden.length > 1 || q.given === 'exBlank' ? flabel(f) : ''}${body}</div>`;
+    }).join('');
+    return `<div class="pq"><span class="pn">${n}</span><div class="pbody">${given}<div class="pholes ${q.hidden.length > 1 ? 'multi' : ''}">${holes}</div></div></div>`;
+  }
+  VIEWS.paper = () => {
+    if (V.done) return paperResult();
+    const total = V.secs.reduce((a, s) => a + s.qs.length, 0), done = V.answered();
+    const sec = V.secs[V.si];
+    let n = V.secs.slice(0, V.si).reduce((a, s) => a + s.qs.length, 0);
+    const last = V.si === V.secs.length - 1;
+    return `<div class="stop"><button class="icon quit" data-a="quit" aria-label="Quitter">${ico('x')}</button>
+        <div class="prog"><b style="width:${Math.round(done / total * 100)}%"></b></div><span class="cnt">${done}/${total}</span>
+        ${V.limit ? `<span class="timer">${ico('clock')}<b id="pt">${fmtClock(V.limit - (Date.now() - V.t0))}</b></span>` : ''}</div>
+      <div class="ptabs">${V.secs.map((s, i) => { const a = s.qs.filter(q => V.ans[q.qid] && Object.values(V.ans[q.qid]).some(Boolean)).length; return `<button class="${i === V.si ? 'on' : ''} ${a === s.qs.length ? 'full' : ''}" data-a="paperTab" data-i="${i}"><b>${i + 1}</b><span>${esc(s.title)}</span><small>${a}/${s.qs.length}</small></button>`; }).join('')}</div>
+      <section class="paper">
+        <div class="ph"><span class="pnum">Partie ${V.si + 1}</span><h2>${ico(SEC_ICON[sec.key])} ${esc(sec.title)}</h2><p class="muted small">${esc(sec.desc)}</p></div>
+        ${sec.qs.map(q => paperQ(q, ++n)).join('')}
+      </section>
+      ${V.mode === 'type' ? `<button class="link osk-toggle" data-a="toggleOsk">${ico('keyboard')} Clavier arabe à l'écran : ${S().settings.osk ? 'activé' : 'désactivé'}</button>` : ''}
+      <div class="pnav">${V.si > 0 ? `<button class="btn" data-a="paperTab" data-i="${V.si - 1}">${ico('back')}Partie précédente</button>` : '<span></span>'}
+        ${last ? `<button class="btn primary lg" data-a="submitPaper">Rendre ma copie</button>` : `<button class="btn primary" data-a="paperTab" data-i="${V.si + 1}">Partie suivante ${ico('arrow')}</button>`}</div>`;
+  };
+  function checkPaperField(q, f, v) {
+    const it = q.item;
+    if (V.mode === 'qcm') return { ok: v != null && v === it[f] };
+    if (!v) return { ok: false, empty: true };
+    if (f === 'blank') {
+      const r = AR.check(v, it.blank, V.level, f);
+      if (r.ok) return r;
+      const b = s => AR.letters(s).replace(/^(ال|وال|بال|فال|لل)/, '');
+      return { ok: V.level !== 'strict' && b(v) === b(it.blank), near: r.near };
+    }
+    return F[f].isAr ? AR.check(v, it[f], V.level, f) : AR.checkFr(v, it[f]);
+  }
+  function submitPaper(force) {
+    const total = V.secs.reduce((a, s) => a + s.qs.length, 0), left = total - V.answered();
+    if (!force && left > 0 && !confirm(`Il reste ${left} question${left > 1 ? 's' : ''} sans réponse. Rendre ta copie quand même ?`)) return;
+    stopTimers();
+    const secs = V.secs.map(s => {
+      let ok = 0, tot = 0;
+      const qs = s.qs.map(q => {
+        const a = V.ans[q.qid] || {};
+        const fields = q.hidden.map(f => Object.assign({ f, v: a[f] || '' }, checkPaperField(q, f, a[f])));
+        const good = fields.filter(x => x.ok).length; ok += good; tot += fields.length;
+        Store.answer(q.item.id, good === fields.length);
+        return { q, fields, ok: good === fields.length };
+      });
+      return { key: s.key, title: s.title, ok, tot, pct: tot ? ok / tot : 0, qs };
+    });
+    const ok = secs.reduce((a, s) => a + s.ok, 0), tot = secs.reduce((a, s) => a + s.tot, 0);
+    const note = tot ? ok / tot * 20 : 0;
+    V.result = { secs, note, ok, tot, time: Date.now() - V.t0 };
+    S().exams.push({ at: Date.now(), center: S().center, note: Math.round(note * 10) / 10, secs: Object.fromEntries(secs.map(s => [s.key, Math.round(s.pct * 100)])) });
+    gain(Math.round(ok * 1.5) + 10, false);
+    V.done = true; render(); window.scrollTo(0, 0);
+    later(() => { if (note >= 14) { FX.sound.win(); FX.confetti(note >= 17 ? 160 : 80); } else FX.sound.ok(); }, 200);
+  }
+  function paperResult() {
+    const R = V.result, weak = R.secs.filter(s => s.pct < 0.75);
+    const wrongAll = [...new Map(R.secs.flatMap(s => s.qs.filter(x => !x.ok).map(x => [x.q.item.id, LIB.items[x.q.item.id]]))).values()].filter(Boolean);
+    const hist = S().exams.filter(e => e.center === S().center).slice(-6).reverse();
+    const ansCell = (x, f, it) => {
+      const right = f === 'blank' ? it.blank : it[f];
+      return `<div class="cf ${x.ok ? 'ok' : 'ko'}">${flabel(f)}${x.ok ? `${ico('check')}${val(f, right, 'md')}` : `${x.v ? `<s>${val(f, x.v)}</s>` : '<span class="muted small">pas de réponse</span>'}${ico('arrow')}${val(f, right, 'md')}`}</div>`;
+    };
+    return `<div class="done">
+      <div class="note ${R.note >= 10 ? 'ok' : 'ko'}"><b>${fmtNote(R.note)}</b><span>/20</span></div>
+      <h1>${mention(R.note)}</h1>
+      <p class="muted">${R.ok}/${R.tot} réponses justes · ${fmtTime(R.time)}</p></div>
+      <section class="panel"><h2>Résultats par partie</h2>
+        ${R.secs.map(s => `<div class="mrow"><span>${ico(SEC_ICON[s.key])} ${esc(s.title)}</span>${bar(s.pct)}<b class="${s.pct >= 0.75 ? 'okc' : 'koc'}">${Math.round(s.pct * 100)} %</b></div>`).join('')}</section>
+      ${weak.length ? `<section class="panel plan"><h2>${ico('target', 'red')} Ton plan de révision</h2><p class="muted small">Les parties sous 75 % : entraîne-toi d'abord sur les mots ratés.</p>
+        ${weak.map(s => { const wr = s.qs.filter(x => !x.ok).map(x => x.q.item.id); return `<div class="planrow"><div><b>${esc(s.title)}</b><small class="muted">${wr.length} erreur${wr.length > 1 ? 's' : ''} · ${Math.round(s.pct * 100)} %</small></div>
+          <div class="row wrap"><button class="btn sm" data-a="planCards" data-k="${s.key}">${ico('zap')}Réviser ces mots</button><button class="btn sm ghost" data-a="planRedo" data-k="${s.key}">${ico('repeat')}Refaire la partie</button></div></div>`; }).join('')}</section>`
+        : `<section class="panel plan"><h2>${ico('trophy')} Rien à rattraper</h2><p class="muted small">Toutes les parties sont au-dessus de 75 %. Passe à une page suivante ou fais un examen plus long.</p></section>`}
+      <div class="row wrap center">${wrongAll.length ? `<button class="btn primary" data-a="redoWrong">${ico('repeat')}Refaire toutes mes erreurs (${wrongAll.length})</button>` : ''}<button class="btn" data-a="go" data-to="examSetup">Nouvel examen</button><button class="btn ghost" data-a="go" data-to="home">Accueil</button></div>
+      <h2 class="sec">Correction détaillée</h2>
+      ${R.secs.map((s, si) => `<section class="panel corr"><h3>Partie ${si + 1} · ${esc(s.title)}</h3>
+        ${s.qs.map((x, i) => { const it = x.q.item; const g = x.q.given === 'exBlank' ? ar(it.exBlank, 'sm') : val(x.q.given, it[x.q.given], 'md'); return `<div class="cq ${x.ok ? 'ok' : 'ko'}"><span class="pn">${i + 1}</span><div class="cqb"><div class="cg">${g}${it.fr && x.q.given !== 'fr' ? ` <small class="muted">${esc(it.fr)}</small>` : ''}</div><div class="cfs">${x.fields.map(fx => ansCell(fx, fx.f, it)).join('')}</div></div></div>`; }).join('')}</section>`).join('')}
+      ${hist.length > 1 ? `<section class="panel"><h2>${ico('chart')} Ta progression</h2>${examHistory(hist)}</section>` : ''}`;
+  }
   function startExamQs(qs, opts = {}) {
     if (!qs.length) { toast('Pas assez de mots dans la sélection.'); return; }
     const e = S().exam;
@@ -460,14 +599,14 @@
       ${wrong.length ? `<section class="panel left"><h2>À retravailler (${wrong.length})</h2>
         ${wrong.map(r => { const it = LIB.items[r.id]; return it ? `<details><summary>${ar(Engine.head(it), 'md')} <span class="muted">${esc(it.fr)}</span></summary>${itemCard(it, true)}</details>` : ''; }).join('')}
         ${V.duel ? '' : `<button class="btn primary" data-a="retryWrong">${ico('repeat')}Rejouer mes erreurs</button>`}</section>` : ''}
-      <div class="col">${V.duel ? `<button class="btn primary" data-a="go" data-to="duel">Retour aux duels</button>` : `<button class="btn primary" data-a="${V.review ? 'startRevision' : 'go'}" data-to="examSetup">Recommencer</button>`}
+      <div class="col">${V.duel ? `<button class="btn primary" data-a="go" data-to="duel">Retour aux duels</button>` : `<button class="btn primary" data-a="${V.review ? 'startRevision' : 'go'}" data-to="games">${V.review ? 'Recommencer' : 'Retour aux jeux'}</button>`}
       <button class="btn ghost" data-a="go" data-to="home">Accueil</button></div></div>`;
   }
 
   /* ----- Jeux ----- */
   const GAMES = {
-    rush: { icon: 'zap', name: 'Chrono-rush', desc: '60 secondes pour enchaîner un maximum de bonnes réponses. Les séries multiplient les points.', c: 'var(--c-rush)' },
-    tf: { icon: 'scale', name: 'Vrai ou faux', desc: 'Une paire s\'affiche : est-elle juste ? Réponds au plus vite, 45 secondes.', c: 'var(--c-tf)' },
+    rush: { icon: 'zap', name: 'Chrono-rush', desc: 'Enchaîne un maximum de bonnes réponses avant la fin du chrono. Les séries multiplient les points.', c: 'var(--c-rush)' },
+    tf: { icon: 'scale', name: 'Vrai ou faux', desc: 'Une paire s\'affiche : est-elle juste ? Réponds au plus vite avant la fin du chrono.', c: 'var(--c-tf)' },
     rain: { icon: 'rain', name: 'Pluie de mots', desc: 'Les mots tombent de plus en plus vite. Réponds avant qu\'ils touchent le sol. 3 vies.', c: 'var(--c-rain)' },
     anagram: { icon: 'letters', name: 'Lettres mélangées', desc: 'Reconstruis le mot arabe lettre par lettre. Idéal pour l\'orthographe.', c: 'var(--c-ana)' }
   };
@@ -483,32 +622,43 @@
   VIEWS.gameSetup = () => {
     const g = GAMES[V.game], w = S().game.what;
     const items = Engine.itemsFor(sel());
-    const pairs = Engine.pairsFor(w).filter(p => V.game !== 'anagram' || F[p[1]].isAr);
-    const n = Engine.playable(items, pairs).length;
+    const pairs = Engine.pairsFor(w).filter(p => V.game !== 'anagram' || (F[p[1]].isAr && p[1] !== 'prep'));
+    const n = Engine.playable(Engine.expandPreps(items), pairs).length;
+    const G = S().game, k = V.game;
+    const opts = [
+      (k === 'rush' || k === 'tf') ? `<h3>Durée</h3>${seg('gameOpt', 'dur', [[15, '15 s'], [30, '30 s'], [45, '45 s'], [60, '1 min'], [120, '2 min']], G.dur)}` : '',
+      (k === 'rush' || k === 'rain') ? `<h3>Nombre de choix</h3>${seg('gameOpt', 'choices', [[3, '3'], [4, '4'], [6, '6']], G.choices)}` : '',
+      k === 'rain' ? `<h3>Vitesse de départ</h3>${seg('gameOpt', 'speed', [['slow', 'Lente'], ['normal', 'Normale'], ['fast', 'Rapide']], G.speed)}` : '',
+      k === 'anagram' ? `<h3>Nombre de mots</h3>${seg('gameOpt', 'n', [[10, '10'], [20, '20'], [30, '30']], G.n)}` : ''
+    ].join('');
     return `<button class="link back" data-a="go" data-to="games">${ico('back')}Jeux</button>
       <div class="ghead" style="--c:${g.c}"><span class="gi">${ico(g.icon)}</span><div><h1>${g.name}</h1><p class="muted">${esc(g.desc)}</p></div><span class="best">${ico('trophy')}Record : ${S().best[V.game] || 0}</span></div>
       <section class="panel"><h2 class="step"><i>1</i>Quoi réviser ?</h2>${picker()}</section>
       <section class="panel"><h2 class="step"><i>2</i>Types de questions</h2>${whatChips(w, 'gameWhat')}</section>
+      <section class="panel"><h2 class="step"><i>3</i>Options</h2>${opts}<p class="muted small">Les mots sont tirés au hasard : chacun passe une fois avant qu'un mot revienne.</p></section>
       <div class="cta-bar"><div class="cta-info"><b>${n}</b> mots jouables</div><button class="btn primary lg" data-a="startGame" ${n >= 4 ? '' : 'disabled'}>Jouer</button></div>`;
   };
   function startGame(k) {
-    const items = Engine.itemsFor(sel()), w = S().game.what;
+    const G = S().game, w = G.what;
+    const items = Engine.expandPreps(Engine.itemsFor(sel()));
     const pairs = Engine.pairsFor(w);
     const pool = Engine.playable(items, pairs);
     if (pool.length < 4) { toast('Pas assez de mots pour ces réglages.'); return; }
+    const next = Engine.bag(pool), ch = G.choices, dur = G.dur * 1000;
     if (k === 'rush') {
-      go('rush', { items: pool, pairs, q: Engine.gameQ(pool, pairs), score: 0, combo: 0, maxCombo: 0, n: 0, dur: 60000, end: Date.now() + 60000, fb: null });
+      go('rush', { items: pool, pairs, next, ch, q: Engine.gameQ(pool, pairs, next, Math.random, ch), score: 0, combo: 0, maxCombo: 0, n: 0, dur, end: Date.now() + dur, fb: null });
       timer = setInterval(rushTick, 100);
     } else if (k === 'tf') {
-      go('tf', { items: pool, pairs, q: Engine.tfQ(pool, pairs), score: 0, combo: 0, maxCombo: 0, n: 0, dur: 45000, end: Date.now() + 45000, fb: null });
+      go('tf', { items: pool, pairs, next, q: Engine.tfQ(pool, pairs, next), score: 0, combo: 0, maxCombo: 0, n: 0, dur, end: Date.now() + dur, fb: null });
       timer = setInterval(rushTick, 100);
     } else if (k === 'rain') {
-      go('rain', { items: pool, pairs, q: Engine.gameQ(pool, pairs), score: 0, lives: 3, speed: 9000, qid: 0, fb: null });
+      const speed = { slow: 11000, normal: 9000, fast: 6500 }[G.speed] || 9000;
+      go('rain', { items: pool, pairs, next, ch, q: Engine.gameQ(pool, pairs, next, Math.random, ch), score: 0, lives: 3, speed, qid: 0, fb: null });
       armRain();
     } else if (k === 'anagram') {
-      const q = Engine.anagramQ(pool, w);
+      const q = Engine.anagramQ(pool, w, next);
       if (!q) { toast('Choisis au moins un type avec des réponses en arabe.'); return; }
-      go('anagram', { items: pool, w, q, built: [], round: 0, total: 10, score: 0, hints: 0, fb: null, ok: 0 });
+      go('anagram', { items: pool, w, next, q, built: [], round: 0, total: G.n, score: 0, hints: 0, fb: null, ok: 0 });
     }
   }
   function gameOver(k, score, extra = {}) {
@@ -557,7 +707,7 @@
       (V.combo % 5 === 0 ? FX.sound.combo : FX.sound.ok)(); FX.floatCenter('+' + pts, 'pts');
     } else { V.combo = 0; FX.sound.bad(); FX.buzz(80); Store.answer(q.item.id, false); }
     render();
-    later(() => { if (V.name !== 'rush' || V.over) return; V.fb = null; V.q = Engine.gameQ(V.items, V.pairs, Math.random, q.item.id); render(); }, ok ? 320 : 1200);
+    later(() => { if (V.name !== 'rush' || V.over) return; V.fb = null; V.q = Engine.gameQ(V.items, V.pairs, () => V.next(q.item), Math.random, V.ch); render(); }, ok ? 320 : 1200);
   }
 
   VIEWS.tf = () => {
@@ -581,7 +731,7 @@
     if (ok) { V.combo++; V.maxCombo = Math.max(V.maxCombo, V.combo); const pts = 1 + Math.floor(V.combo / 5); V.score += pts; (V.combo % 5 === 0 ? FX.sound.combo : FX.sound.ok)(); FX.floatCenter('+' + pts, 'pts'); }
     else { V.combo = 0; FX.sound.bad(); FX.buzz(80); Store.answer(q.item.id, false); }
     render();
-    later(() => { if (V.name !== 'tf' || V.over) return; V.fb = null; V.q = Engine.tfQ(V.items, V.pairs); render(); }, ok ? 350 : 1400);
+    later(() => { if (V.name !== 'tf' || V.over) return; V.fb = null; V.q = Engine.tfQ(V.items, V.pairs, () => V.next(q.item)); render(); }, ok ? 350 : 1400);
   }
 
   function armRain() {
@@ -613,7 +763,7 @@
     later(() => {
       if (V.name !== 'rain') return;
       if (V.lives <= 0) { gameOver('rain', V.score); return; }
-      V.fb = null; V.q = Engine.gameQ(V.items, V.pairs, Math.random, q.item.id); render(); armRain();
+      V.fb = null; V.q = Engine.gameQ(V.items, V.pairs, () => V.next(q.item), Math.random, V.ch); render(); armRain();
     }, ok ? 380 : 1500);
   }
 
@@ -649,7 +799,7 @@
   function anaNext() {
     V.round++; V.hints = 0; V.built = []; V.fb = null;
     if (V.round >= V.total) { gameOver('anagram', V.score); return; }
-    V.q = Engine.anagramQ(V.items, V.w, Math.random, V.q.item.id); render();
+    const prev = V.q.item; V.q = Engine.anagramQ(V.items, V.w, () => V.next(prev)); render();
   }
 
   /* ----- Duel : page principale ----- */
@@ -677,8 +827,9 @@
         <p class="muted small">Contenu : <b>${esc(center().name)}</b> · ${nItems} mots selon ta sélection — <button class="link" data-a="go" data-to="reviewSetup">changer</button></p>
         <h3>Questions</h3>${seg('liveOpt', 'n', [[5, '5'], [10, '10'], [15, '15'], [20, '20']], l.n)}
         <h3>Réponses</h3>${seg('liveOpt', 'mode', [['qcm', 'Choix multiples'], ['type', 'Écrire']], l.mode)}
-        <h3>Temps par question</h3>${seg('liveOpt', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s']], l.time)}
-        <p class="muted small">Conseil : 30 s pour les choix multiples, 60 s quand il faut écrire.</p>
+        <h3>Temps par question</h3>${seg('liveOpt', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], l.time)}
+        <h3>Après chaque question</h3>${seg('liveOpt', 'adv', [['auto', 'On passe tout seul'], ['manual', 'Bouton « Suivant »']], l.adv)}
+        <p class="muted small">Avec « Suivant », vous voyez la correction et vous pouvez en discuter avant de continuer. Le chrono peut aussi être mis en pause à tout moment.</p>
         <button class="btn primary lg wide" data-a="liveCreate" ${nItems ? '' : 'disabled'}>Créer la salle</button></section>
       <section class="panel"><h2>Rejoindre une salle</h2>
         <div class="row"><input id="liveCode" class="codein" placeholder="CODE" maxlength="5" value="${esc(V.joinCode || '')}" autocapitalize="characters"><button class="btn primary" data-a="liveJoin">Rejoindre</button></div></section>`;
@@ -700,34 +851,44 @@
   const isHost = () => V.room && V.room.host === Cloud.uid();
   const opp = () => { const r = V.room; if (!r) return null; const id = Object.keys(r.players).find(k => k !== Cloud.uid()); return id ? Object.assign({ id }, r.players[id]) : null; };
   const mine = () => (V.room ? V.room.players[Cloud.uid()] : null);
+  const liveLim = () => V.room.settings.time * 1000;
   function onRoom(data, err) {
     if (V.name !== 'live') return;
     V.loading = false; V.room = data; V.err = err ? err.message : null;
-    if (!data) { render(); return; }
-    if (!data.players[Cloud.uid()]) { V.kicked = true; render(); return; }
+    if (!data) { Call.detach(); render(); return; }
+    if (!data.players[Cloud.uid()]) { V.kicked = true; Call.detach(); render(); return; }
+    Call.attach(V.code, data);
     const st = data.settings;
     if (data.state !== 'lobby' && (!V.qs || V.seed !== st.seed)) { V.qs = liveQs(st); V.seed = st.seed; }
     if (data.state === 'playing') {
-      if (V.qi !== data.qi) { V.qi = data.qi; V.t0 = Date.now(); V.pick = {}; V.cur = null; V.sent = false; }
+      if (V.qi !== data.qi) { V.qi = data.qi; V.t0 = Date.now(); V.pick = {}; V.cur = null; V.sent = false; V.paused = null; }
+      // pause : le chrono est figé pour les deux joueurs
+      const pz = data.paused && data.paused.qi === data.qi ? data.paused : null;
+      if (pz) V.paused = pz;
+      else if (V.paused) { V.t0 = Date.now() - (liveLim() - V.paused.left); V.paused = null; }
       const all = Object.values(data.players).every(p => p.ans && p.ans[data.qi]);
-      if (all && V.revealFor !== data.qi) { V.revealFor = data.qi; V.revealAt = Date.now(); FX.sound.flip(); }
-      if (all && isHost() && V.advFor !== data.qi) { V.advFor = data.qi; const qi = data.qi; later(() => Cloud.advance(V.code, qi + 1, V.qs.length), 3500); }
+      if (all && V.revealFor !== data.qi) { V.revealFor = data.qi; FX.sound.flip(); }
+      if (all && isHost() && st.adv !== 'manual' && !V.paused && V.advFor !== data.qi) {
+        V.advFor = data.qi; const qi = data.qi;
+        later(() => { if (V.room && !V.room.paused && V.room.qi === qi) Cloud.advanceFrom(V.code, qi, V.qs.length).catch(console.warn); else V.advFor = null; }, 3500);
+      }
     }
-    if (data.state === 'lobby') { V.qs = null; V.qi = null; V.recorded = false; V.advFor = null; V.revealFor = null; }
+    if (data.state === 'lobby') { V.qs = null; V.qi = null; V.recorded = false; V.advFor = null; V.revealFor = null; V.paused = null; V.celebrated = false; }
     if (data.state === 'done') recordLive(data);
     render();
   }
   function liveTick() {
-    const r = V.room; if (!r || r.state !== 'playing' || V.qi == null) return;
-    const lim = r.settings.time * 1000, el = Date.now() - V.t0, left = lim - el;
+    const r = V.room; if (!r || r.state !== 'playing' || V.qi == null || V.paused) return;
+    const lim = liveLim(), el = Date.now() - V.t0, left = lim - el;
     const t = document.getElementById('lt'); if (t) t.textContent = Math.max(0, Math.ceil(left / 1000));
     const tb = document.getElementById('tb'); if (tb) { tb.style.transform = `scaleX(${Math.max(0, left / lim)})`; tb.classList.toggle('hurry', left < 8000); }
     if (!V.sent && left <= 0) submitLive(true);
-    // si l'adversaire ne répond plus (connexion perdue), l'hôte passe à la suite
-    if (isHost() && el > lim + 6000 && V.advFor !== V.qi) { V.advFor = V.qi; Cloud.advance(V.code, V.qi + 1, V.qs.length); }
+    // adversaire déconnecté : l'hôte passe à la suite (mode automatique) ou le bouton apparaît
+    if (el > lim + 6000 && !V.stale) { V.stale = V.qi; if (isHost() && r.settings.adv !== 'manual') Cloud.advanceFrom(V.code, V.qi, V.qs.length).catch(console.warn); else render(); }
+    if (V.stale !== false && V.stale !== V.qi && el < lim) V.stale = false;
   }
   function submitLive(timeout) {
-    if (V.sent || !V.qs) return;
+    if (V.sent || !V.qs || V.paused) return;
     const st = V.room.settings, q = V.qs[V.qi];
     if (!timeout && st.mode === 'qcm' && q.hidden.some(f => V.pick[f] == null)) { toast('Réponds à toutes les cases'); return; }
     const { cur, nOk, all } = grade_q(q, st.mode, V.pick, st.h || 'none');
@@ -752,8 +913,9 @@
     const r = V.room;
     if (!r || V.kicked) return `<div class="done">${doneIcon('x', 'ko')}<h1>Salle fermée</h1><p class="muted">${V.err ? esc(V.err) : 'L\'hôte a fermé la salle ou elle n\'existe plus.'}</p><div class="col"><button class="btn primary" data-a="go" data-to="duel">Retour</button></div></div>`;
     const st = r.settings, o = opp();
+    const playing = r.state === 'playing' && V.qs;
     const quit = `<div class="stop"><button class="icon quit" data-a="liveQuit" aria-label="Quitter">${ico('x')}</button><span class="roomcode">Salle <b>${esc(V.code)}</b></span>
-      <button class="btn sm ghost" data-a="video">${ico('video')}Appel vidéo</button></div>`;
+      ${playing ? (V.paused ? `<button class="btn sm primary" data-a="liveResume">${ico('play')}Reprendre</button>` : `<button class="btn sm" data-a="livePause">${ico('pause')}Pause</button>`) : ''}</div>`;
     if (r.state === 'lobby') {
       const missing = st.l.filter(id => !LIB.lessons[id]);
       const words = Engine.itemsFor(st.l).length;
@@ -761,36 +923,45 @@
         <section class="panel lobby"><p class="muted small">Donne ce code à ton binôme :</p>
           <div class="bigcode">${esc(V.code).split('').map(c => `<span>${c}</span>`).join('')}</div>
           <div class="row center wrap"><button class="btn sm" data-a="copy" data-text="${esc(V.code)}">${ico('copy')}Copier le code</button>
-          ${location.protocol.startsWith('http') ? `<button class="btn sm" data-a="copy" data-text="${esc(location.origin + location.pathname + '#live=' + V.code)}">${ico('link')}Copier le lien</button>` : ''}</div></section>
+          ${location.protocol.startsWith('http') ? `<button class="btn sm" data-a="copy" data-text="${esc(location.origin + location.pathname + '#live=' + V.code)}">${ico('link')}Copier le lien</button>` : ''}</div>
+          <p class="muted small">${ico('headset')} Rejoignez le salon vocal en bas de l'écran pour vous parler pendant la partie.</p></section>
         ${scoreboard(r)}
         <section class="panel"><h3>Réglages de la partie</h3>
-          <p class="small">${words} mots · ${st.n} questions · ${st.mode === 'qcm' ? 'choix multiples' : 'à écrire'} · ${st.time} s par question</p>
+          <p class="small">${words} mots · ${st.n} questions · ${st.mode === 'qcm' ? 'choix multiples' : 'à écrire'} · ${st.time} s par question · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
           ${missing.length ? `<p class="warn">Il te manque des leçons de cette partie (mets l'appli à jour).</p>` : ''}
           ${isHost() ? `<h3>Questions</h3>${seg('liveSet', 'n', [[5, '5'], [10, '10'], [15, '15'], [20, '20']], st.n)}
             <h3>Réponses</h3>${seg('liveSet', 'mode', [['qcm', 'Choix multiples'], ['type', 'Écrire']], st.mode)}
-            <h3>Temps</h3>${seg('liveSet', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s']], st.time)}
+            <h3>Temps</h3>${seg('liveSet', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], st.time)}
+            <h3>Après chaque question</h3>${seg('liveSet', 'adv', [['auto', 'Automatique'], ['manual', 'Bouton « Suivant »']], st.adv || 'auto')}
             <button class="link" data-a="liveUseSel">Utiliser ma sélection actuelle (${Engine.itemsFor(sel()).length} mots)</button>` : ''}</section>
         ${isHost() ? `<button class="btn primary lg wide" data-a="liveStart" ${o ? '' : 'disabled'}>${o ? 'Lancer la partie' : 'En attente de ton binôme…'}</button>`
           : `<div class="waiting"><span class="dots"><i></i><i></i><i></i></span>En attente du lancement par l'hôte</div>`}`;
     }
-    if (r.state === 'playing' && V.qs) {
-      const q = V.qs[V.qi], lim = st.time * 1000, left = lim - (Date.now() - V.t0);
+    if (playing) {
+      const q = V.qs[V.qi], lim = liveLim(), left = V.paused ? V.paused.left : lim - (Date.now() - V.t0);
       const m = mine(), myA = m.ans && m.ans[V.qi], oA = o && o.ans && o.ans[V.qi];
-      const reveal = myA && (oA || !o);
-      const head = `${scoreboard(r)}<div class="livebar"><span class="cnt">Question ${V.qi + 1}/${V.qs.length}</span><span class="timer">${ico('clock')}<b id="lt">${Math.max(0, Math.ceil(left / 1000))}</b> s</span></div>${timebar(reveal ? 0 : left / lim)}`;
+      const stale = V.stale === V.qi;
+      const reveal = myA && (oA || !o || stale);
+      const head = `${scoreboard(r)}<div class="livebar"><span class="cnt">Question ${V.qi + 1}/${V.qs.length}</span><span class="timer ${V.paused ? 'paused' : ''}">${ico(V.paused ? 'pause' : 'clock')}<b id="lt">${Math.max(0, Math.ceil(left / 1000))}</b> s</span></div>${timebar(reveal ? 0 : left / lim)}`;
+      const pauseBox = V.paused ? `<div class="pausebox">${ico('pause')}<div><b>Partie en pause</b><small>${V.paused.by === Cloud.uid() ? 'Tu as mis en pause.' : `${esc(o ? o.name : 'Ton binôme')} a mis en pause.`} Le chrono est arrêté pour vous deux.</small></div><button class="btn primary" data-a="liveResume">${ico('play')}Reprendre</button></div>` : '';
       const card = questionCard(q, st.mode, V.pick, V.cur, st.h || 'none');
-      if (!V.sent) return `${quit}${head}${card}
+      if (!V.sent) return `${quit}${head}${pauseBox}<div class="${V.paused ? 'frozen' : ''}">${card}</div>
         ${st.mode === 'type' ? `<button class="link osk-toggle" data-a="toggleOsk">${ico('keyboard')} Clavier arabe : ${S().settings.osk ? 'activé' : 'désactivé'}</button>` : ''}
         <div class="oppstat">${o ? (oA ? `${avatar(o)} <b>${esc(o.name)}</b> a répondu` : `${avatar(o)} <b>${esc(o.name)}</b> réfléchit <span class="dots"><i></i><i></i><i></i></span>`) : ''}</div>
-        <button class="btn primary lg wide" data-a="liveSubmit">Valider <kbd>Entrée</kbd></button>`;
+        <button class="btn primary lg wide" data-a="liveSubmit" ${V.paused ? 'disabled' : ''}>Valider <kbd>Entrée</kbd></button>`;
       const res = (p, a) => a ? `<div class="rr ${a.ok ? 'ok' : 'ko'}">${avatar(p)}<b>${esc(p.name)}</b><span>${a.to ? 'temps écoulé' : (a.ok ? 'juste' : `${a.n}/${q.hidden.length}`)} · ${(a.ms / 1000).toFixed(1)} s</span><em>+${a.pts}</em></div>` : '';
-      return `${quit}${head}${card}
-        ${reveal ? `<div class="reveal">${res(m, myA)}${o ? res(o, oA) : ''}<p class="muted small center">Question suivante dans un instant…</p></div>`
+      const manual = st.adv === 'manual' || stale;
+      const last = V.qi + 1 >= V.qs.length;
+      return `${quit}${head}${pauseBox}${card}
+        ${reveal ? `<div class="reveal">${res(m, myA)}${o ? res(o, oA) : ''}
+            ${q.item.ex ? `<div class="ex">${ar(q.item.ex)}</div>` : ''}
+            ${manual ? `<button class="btn primary lg wide" data-a="liveNext" ${V.paused ? 'disabled' : ''}>${last ? 'Voir les résultats' : 'Question suivante'} ${ico('arrow')}</button><p class="muted small center">Le premier qui clique fait passer les deux joueurs.</p>`
+              : `<p class="muted small center">${V.paused ? 'En pause : prenez le temps d\'en discuter.' : 'Question suivante dans un instant… (Pause pour en discuter)'}</p>`}</div>`
           : `<div class="waiting">${o ? avatar(o) : ''}<span>En attente de ${esc(o ? o.name : 'ton binôme')}</span><span class="dots"><i></i><i></i><i></i></span></div>`}`;
     }
     if (r.state === 'done') return liveResult(r);
     return `${quit}<div class="done"><h1>…</h1></div>`;
-  }
+  };
   function liveResult(r) {
     const m = mine(), o = opp(), n = V.qs ? V.qs.length : r.settings.n;
     const w = !o ? 1 : m.score > o.score ? 1 : m.score < o.score ? -1 : 0;
@@ -989,44 +1160,138 @@
       </div>`;
   };
 
-  /* ----- Mots / éditeur ----- */
+  /* ----- Mots : base officielle (verrouillée) + mes paquets (modifiables) ----- */
+  const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const deckOf = L => LIB.decks.find(d => d.id === L.deckId);
+  const userDeck = id => S().decks.find(d => d.id === id);
   VIEWS.words = () => {
     if (V.lesson && LIB.lessons[V.lesson]) return lessonView();
-    const decks = centerDecks();
-    return `<div class="page-h"><h1>Mes mots</h1><p class="muted">Consulte, corrige ou ajoute des mots.</p></div>${centerSwitch()}
-      ${decks.length ? decks.map(d => `<section class="panel"><div class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')}</small></div>
-        ${d.lessons.map(l => `<button class="lrow" data-a="openLesson" data-id="${esc(l.id)}"><span class="lt">${esc(l.title)} ${ar(l.titleAr || '', 'sm')}</span><span class="cnt">${l.items.length} mots</span>${bar(Engine.lessonMastery(l))}${ico('chevron', 'chev')}</button>`).join('')}
-        ${d.user ? `<button class="link" data-a="newLesson" data-deck="${esc(d.id)}">${ico('plus')}Nouvelle leçon</button>` : ''}</section>`).join('') : emptyCenter()}
-      <section class="panel"><h3>Ajouter du contenu</h3>
-        <div class="row wrap"><button class="btn sm" data-a="newLesson" data-deck="perso-${S().center}">${ico('plus')}Créer une leçon perso</button>
-        <label class="btn sm">${ico('download')}Importer un paquet (.json)<input type="file" accept=".json,application/json" data-a="importDeck" hidden></label></div>
-        <p class="muted small">Les paquets transcrits depuis tes photos s'importent ici. Ton binôme peut importer les mêmes fichiers.</p></section>`;
+    const decks = centerDecks(), base = decks.filter(d => !d.user), mine = decks.filter(d => d.user);
+    const lrow = l => `<button class="lrow" data-a="openLesson" data-id="${esc(l.id)}"><span class="lt">${esc(l.title)} ${ar(l.titleAr || '', 'sm')}</span><span class="cnt">${l.items.length} mots</span>${bar(Engine.lessonMastery(l))}${ico('chevron', 'chev')}</button>`;
+    return `<div class="page-h"><h1>Mots</h1><p class="muted">La base du livre est fixe. Tes propres paquets, eux, se modifient librement — et seulement pour toi.</p></div>${centerSwitch()}
+      <button class="addbig" data-a="goImport">${ico('plus')}<div><b>Ajouter des mots</b><small>Colle ta liste, une ligne par mot. Ou importe le paquet d'un ami avec son code.</small></div>${ico('chevron')}</button>
+      ${base.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')}</small></div><span class="lock">${ico('check')}Base officielle</span></div>${d.lessons.map(lrow).join('')}</section>`).join('')}
+      <h2 class="sec">Mes paquets</h2>
+      ${mine.length ? mine.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t"><b class="dname">${esc(d.title)}</b><small>${d.lessons.length} page${d.lessons.length > 1 ? 's' : ''}</small></div>
+          <div class="row"><button class="btn sm ghost" data-a="renameDeck" data-id="${esc(d.id)}">Renommer</button><button class="btn sm ghost danger-t" data-a="delDeck" data-id="${esc(d.id)}">Supprimer</button></div></div>
+        ${d.lessons.map(lrow).join('') || '<p class="muted small">Aucune page.</p>'}</section>`).join('')
+        : `<section class="panel empty">${ico('book', 'big')}<h3>Aucun paquet perso</h3><p class="muted">Ajoute tes propres mots : ils s'ajoutent à la base, sans la modifier.</p></section>`}
+      ${!decks.length ? emptyCenter() : ''}`;
   };
   function lessonView() {
-    const L = LIB.lessons[V.lesson];
+    const L = LIB.lessons[V.lesson], d = deckOf(L), own = d && d.user;
+    const selOn = !!V.selMode, picked = V.picked || (V.picked = {});
     const rows = L.items.map(it => {
       const forms = it.t === 'verb' ? [it.mud, it.amr, it.masdar] : [it.pl];
-      return `<button class="wrow" data-a="editItem" data-id="${esc(it.id)}"><span class="dot" style="--m:${Engine.mastery(it)}"></span>
+      const editable = own || it.custom;
+      return `<button class="wrow ${selOn && editable ? 'sel' : ''} ${picked[it.id] ? 'picked' : ''}" data-a="${selOn && editable ? 'pickItem' : 'editItem'}" data-id="${esc(it.id)}">
+        ${selOn && editable ? `<span class="cbx">${picked[it.id] ? ico('check') : ''}</span>` : `<span class="dot" style="--m:${Engine.mastery(it)}"></span>`}
         <span class="wh">${ar(Engine.head(it), 'md')}</span><span class="wf">${ar(forms.filter(Boolean).join(' · '), 'sm')}</span><span class="wt">${esc(it.fr)}</span></button>`;
     }).join('');
-    return `<button class="link back" data-a="go" data-to="words">${ico('back')}Mes mots</button>
-      <div class="page-h"><h1>${esc(L.title)} ${ar(L.titleAr || '', 'md')}</h1></div>
-      <div class="row wrap"><button class="btn primary" data-a="lessonReview" data-id="${esc(L.id)}">${ico('cards')}Réviser cette page</button><button class="btn" data-a="lessonExam" data-id="${esc(L.id)}">${ico('exam')}Examen</button>
-      <button class="btn ghost" data-a="exportLesson" data-id="${esc(L.id)}">${ico('upload')}Exporter</button></div>
+    const nPicked = Object.values(picked).filter(Boolean).length;
+    return `<button class="link back" data-a="go" data-to="words">${ico('back')}Mots</button>
+      <div class="page-h"><h1>${esc(L.title)} ${ar(L.titleAr || '', 'md')}</h1><p class="muted small">${own ? `Mon paquet « ${esc(d.title)} »` : `${ico('check')} Base officielle : non modifiable`} · ${L.items.length} mots</p></div>
+      <div class="row wrap"><button class="btn primary" data-a="lessonReview" data-id="${esc(L.id)}">${ico('cards')}Réviser cette page</button><button class="btn" data-a="lessonExam" data-id="${esc(L.id)}">${ico('exam')}Examen blanc</button>
+        <button class="btn ghost" data-a="copyText" data-id="${esc(L.id)}">${ico('copy')}Copier en texte</button>
+        ${own ? `<button class="btn ghost" data-a="shareLesson" data-id="${esc(L.id)}">${ico('link')}Partager</button>` : ''}</div>
+      ${own ? `<div class="selbar">${selOn
+        ? `<button class="btn sm" data-a="pickAll">Tout sélectionner</button><span class="muted small">${nPicked} sélectionné${nPicked > 1 ? 's' : ''}</span>
+           <button class="btn sm danger" data-a="delPicked" ${nPicked ? '' : 'disabled'}>Supprimer</button><button class="btn sm ghost" data-a="selMode">Terminer</button>`
+        : `<button class="btn sm" data-a="selMode">${ico('check')}Sélectionner plusieurs mots</button><button class="btn sm" data-a="addToLesson" data-id="${esc(L.id)}">${ico('plus')}Ajouter des mots</button>
+           <button class="btn sm ghost" data-a="renameLesson" data-id="${esc(L.id)}">Renommer la page</button><button class="btn sm ghost danger-t" data-a="delLesson" data-id="${esc(L.id)}">Supprimer la page</button>`}</div>` : ''}
       <div class="wlist">${rows || '<p class="muted">Aucun mot.</p>'}</div>
-      <section class="panel"><h3>Ajouter un mot</h3><div class="row wrap">${Object.entries(T).map(([k, t]) => `<button class="btn sm" data-a="newItem" data-t="${k}">${ico('plus')}${t.label}</button>`).join('')}</div></section>
       ${V.edit ? editModal() : ''}`;
   }
   function editModal() {
     const it = V.edit === 'new' ? { t: V.newType } : LIB.items[V.edit];
     if (!it) return '';
+    const L = LIB.lessons[it.lessonId], d = L && deckOf(L);
+    const editable = V.edit === 'new' || it.custom || (d && d.user);
+    if (!editable) return `<div class="modal" data-a="closeEdit"><div class="sheet" data-stop>
+      <div class="row between"><h2>${ar(Engine.head(it), 'md')}</h2><span class="lock">${ico('check')}Base officielle</span></div>${itemCard(it)}
+      <p class="muted small">Les mots du livre ne peuvent pas être modifiés. Une erreur ? Signale-la et elle sera corrigée pour tout le monde.</p>
+      <div class="row between"><span></span><button class="btn primary" data-a="closeEdit">Fermer</button></div></div></div>`;
     return `<div class="modal" data-a="closeEdit"><div class="sheet" data-stop>
       <h2>${V.edit === 'new' ? 'Nouveau' : 'Modifier'} · ${T[it.t].label}</h2>
       ${T[it.t].edit.map(f => `<label class="fld">${flabel(f)}<input data-ef="${f}" class="${F[f].isAr ? 'ar-input' : ''}" dir="${F[f].isAr ? 'rtl' : 'ltr'}" value="${esc(it[f] || '')}" autocomplete="off"></label>`).join('')}
-      <p class="muted small">Plusieurs réponses possibles : sépare-les par « / ».</p>
+      <p class="muted small">Plusieurs réponses possibles : sépare-les par « / ». Préposition avec un sens : إِلَى = aller à / مِنْ = venir de</p>
       <div class="row between">${V.edit !== 'new' ? `<button class="btn danger" data-a="delItem">Supprimer</button>` : '<span></span>'}
       <div class="row"><button class="btn ghost" data-a="closeEdit">Annuler</button><button class="btn primary" data-a="saveItem">Enregistrer</button></div></div>
     </div></div>`;
+  }
+  // supprime des mots de mes paquets (ou des ajouts perso)
+  function deleteItems(ids) {
+    const set = new Set(ids);
+    for (const d of S().decks) for (const l of d.lessons || []) l.items = (l.items || []).filter(it => !set.has(it.id));
+    for (const k of Object.keys(S().custom)) S().custom[k] = S().custom[k].filter(it => !set.has(it.id));
+    for (const id of ids) { for (const c of Object.keys(S().cards)) if (c.startsWith(id + '|')) delete S().cards[c]; delete S().items[id]; delete S().edits[id]; }
+    Store.save(); rebuild();
+  }
+
+  /* ----- Ajouter des mots (texte simple) ----- */
+  VIEWS.import = () => {
+    const im = V.imp || (V.imp = { deck: 'new', lesson: 'new', deckName: '', lessonName: '', text: '' });
+    const mine = centerDecks().filter(d => d.user);
+    if (im.deck !== 'new' && !mine.some(d => d.id === im.deck)) im.deck = mine.length ? mine[0].id : 'new';
+    const d = mine.find(x => x.id === im.deck);
+    return `<button class="link back" data-a="go" data-to="words">${ico('back')}Mots</button>
+      <div class="page-h"><h1>Ajouter des mots</h1><p class="muted">Écris ou colle ta liste : une ligne = un mot. L'appli reconnaît toute seule les verbes, les noms et les pluriels.</p></div>
+      <section class="panel"><h2 class="step"><i>1</i>Où les ranger ?</h2>${centerSwitch()}
+        <h3>Paquet</h3><div class="pchips">${mine.map(x => `<button class="pchip ${im.deck === x.id ? 'on' : ''}" data-a="impDeck" data-id="${esc(x.id)}">${esc(x.title)}</button>`).join('')}
+          <button class="pchip ${im.deck === 'new' ? 'on' : ''}" data-a="impDeck" data-id="new">${ico('plus')}Nouveau paquet</button></div>
+        ${im.deck === 'new' ? `<input class="impf" data-k="deckName" placeholder="Nom du paquet (ex. Mustawa 1, Al-Furqan niveau 2…)" value="${esc(im.deckName)}">` : ''}
+        <h3>Page</h3><div class="pchips">${(d ? d.lessons : []).map(l => `<button class="pchip ${im.lesson === l.id ? 'on' : ''}" data-a="impLesson" data-id="${esc(l.id)}">${esc(l.title)}</button>`).join('')}
+          <button class="pchip ${im.lesson === 'new' ? 'on' : ''}" data-a="impLesson" data-id="new">${ico('plus')}Nouvelle page</button></div>
+        ${im.lesson === 'new' ? `<input class="impf" data-k="lessonName" placeholder="Nom de la page (ex. Leçon 3 · Verbes)" value="${esc(im.lessonName)}">` : ''}</section>
+      <section class="panel"><h2 class="step"><i>2</i>Tes mots</h2>
+        <details class="fmt"><summary>${ico('hint')} Comment écrire ? (exemples)</summary>
+          <table class="fmt-t">
+            <tr><td>Verbe</td><td dir="rtl" class="ar sm">ذَهَبَ / يَذْهَبُ / اِذْهَبْ / ذَهَابًا = aller</td></tr>
+            <tr><td>Verbe + préposition</td><td dir="rtl" class="ar sm">ذَهَبَ / يَذْهَبُ + إِلَى = aller</td></tr>
+            <tr><td>Nom + pluriel</td><td dir="rtl" class="ar sm">مَطَارٌ (مَطَارَاتٌ) = aéroport</td></tr>
+            <tr><td>Avec un contraire</td><td dir="rtl" class="ar sm">كَبِيرٌ = grand | contraire: صَغِيرٌ</td></tr>
+            <tr><td>Avec synonyme et phrase</td><td dir="rtl" class="ar sm">طَالِبٌ = étudiant | synonyme: تِلْمِيذٌ | phrase: الطَّالِبُ جَدِيدٌ</td></tr>
+          </table>
+          <p class="muted small">Règles : l'arabe à gauche du signe <b>=</b>, le français à droite. Les formes d'un verbe sont séparées par <b>/</b>. Le pluriel va entre <b>( )</b>. Les infos en plus se mettent après <b>|</b>. Tu peux aussi coller directement des colonnes depuis Excel ou Google Sheets.</p></details>
+        <textarea id="impText" rows="9" placeholder="${esc(Importer.EXAMPLE)}">${esc(im.text)}</textarea>
+        <div class="row wrap"><button class="btn sm ghost" data-a="impExample">Insérer un exemple</button></div>
+        <div id="impPrev">${importPreview()}</div></section>
+      <div class="cta-bar"><div class="cta-info" id="impCount">${importCount()}</div><button class="btn primary lg" data-a="impSave">Ajouter</button></div>
+      <section class="panel"><h2>Importer le paquet d'un ami</h2><p class="muted small">Ton ami ouvre sa page, clique sur « Partager » et te donne le code.</p>
+        <div class="row"><input id="shareCode" class="codein" placeholder="CODE" maxlength="5" autocapitalize="characters"><button class="btn primary" data-a="impCode">Importer</button></div>
+        <label class="link">${ico('download')}ou importer un fichier .json<input type="file" accept=".json,application/json" data-a="importDeck" hidden></label></section>`;
+  };
+  function importPreview() {
+    const rows = Importer.parse((V.imp || {}).text || '');
+    if (!rows.length) return '<p class="muted small">L\'aperçu de tes mots apparaîtra ici.</p>';
+    return `<div class="prev">${rows.map(r => r.item
+      ? `<div class="pv-row"><span class="tag t-${r.item.t}">${T[r.item.t].label}</span><span class="ar sm" dir="rtl">${esc(r.item.t === 'verb' ? [r.item.madi, r.item.mud, r.item.amr, r.item.masdar].filter(Boolean).join(' · ') : r.item.w + (r.item.pl ? ' — ' + r.item.pl : ''))}</span><span class="pv-fr">${esc(r.item.fr)}</span>
+        <span class="pv-x">${[r.item.prep && 'حرف : ' + r.item.prep, r.item.ant && 'contraire', r.item.syn && 'synonyme', r.item.ex && 'phrase'].filter(Boolean).map(esc).join(' · ')}</span></div>`
+      : `<div class="pv-row err"><span class="tag t-err">À corriger</span><span class="pv-raw">${esc(r.raw)}</span><span class="pv-fr">${esc(r.error)}</span></div>`).join('')}</div>`;
+  }
+  function importCount() {
+    const rows = Importer.parse((V.imp || {}).text || ''), ok = rows.filter(r => r.item).length, bad = rows.length - ok;
+    return `<b>${ok}</b> mot${ok > 1 ? 's' : ''} prêt${ok > 1 ? 's' : ''}${bad ? `<small class="koc">${bad} ligne${bad > 1 ? 's' : ''} à corriger</small>` : '<small>vérifie l\'aperçu</small>'}`;
+  }
+  function importSave() {
+    const im = V.imp, rows = Importer.parse(im.text || '').filter(r => r.item);
+    if (!rows.length) { toast('Ajoute au moins un mot valide'); return; }
+    let d = im.deck === 'new' ? null : userDeck(im.deck);
+    if (!d) { d = { id: 'u' + rid(), center: S().center, title: im.deckName.trim() || 'Mes mots', subtitle: 'Mon paquet', order: 500, user: true, lessons: [] }; S().decks.push(d); }
+    let l = im.lesson === 'new' ? null : d.lessons.find(x => x.id === im.lesson);
+    if (!l) { l = { id: d.id + '-' + rid(), title: im.lessonName.trim() || `Page ${d.lessons.length + 1}`, items: [] }; d.lessons.push(l); }
+    rows.forEach(r => l.items.push(Object.assign({ id: 'w' + rid() }, r.item)));
+    Store.save(); rebuild(); V.imp = null;
+    toast(`${rows.length} mot${rows.length > 1 ? 's' : ''} ajouté${rows.length > 1 ? 's' : ''}`);
+    go('words', { lesson: l.id });
+  }
+  function addSharedPack(p) {
+    if (!p || !p.deck || !p.lesson) throw new Error('Paquet invalide');
+    let d = userDeck(p.deck.id);
+    if (!d) { d = Object.assign({ order: 500, subtitle: 'Paquet partagé' }, p.deck, { user: true, lessons: [] }); S().decks.push(d); }
+    d.lessons = d.lessons.filter(l => l.id !== p.lesson.id).concat([p.lesson]);
+    Store.save(); rebuild();
+    return p.lesson;
   }
 
   /* ----- Réglages ----- */
@@ -1057,7 +1322,7 @@
     go: b => go(b.dataset.to),
     quit: () => {
       if (V.name === 'exam' && V.duel && !V.over && !confirm('Abandonner le duel ? Ton tour ne pourra pas être rejoué.')) return;
-      const back = V.duel ? ['duel', { tab: 'code' }] : V.name === 'exam' && !V.review ? ['examSetup'] : V.name === 'exam' || V.name === 'flash' ? ['reviewSetup'] : ['gameSetup', { game: V.name }];
+      const back = V.duel ? ['duel', { tab: 'code' }] : V.name === 'paper' ? ['examSetup'] : V.name === 'exam' && !V.review ? ['games'] : V.name === 'exam' || V.name === 'flash' ? ['reviewSetup'] : ['gameSetup', { game: V.name }];
       go(back[0], back[1] || {});
     },
     saveName: () => { const v = (document.getElementById('nameIn').value || '').trim(); if (!v) return; S().name = v; Store.save(); toast('Enregistré'); render(); },
@@ -1072,10 +1337,11 @@
     selNone: () => { S().sel = []; Store.save(); render(); },
     quickReview: () => {
       const cards = Engine.cards(Engine.itemsFor(sel()), S().rev);
-      if (Engine.srsQueue(cards).length) { S().rev.mode = 'srs'; Store.save(); startRevision(); }
+      if (Engine.srsQueue(cards).length) { S().rev.mode = 'flip'; S().rev.which = 'due'; Store.save(); startRevision(); }
       else go('reviewSetup');
     },
     quickMode: b => { S().rev.mode = b.dataset.v; Store.save(); go('reviewSetup'); },
+    goImport: () => go('import'),
     reviseDeck: b => { const d = LIB.decks.find(x => x.id === b.dataset.id); S().sel = d.lessons.map(l => l.id); Store.save(); go('reviewSetup'); },
     revOpt: b => { S().rev[b.dataset.k] = parseV(b.dataset.v); Store.save(); FX.sound.tap(); render(); },
     revWhat: b => { const w = S().rev.what; w[b.dataset.k] = !w[b.dataset.k]; Store.save(); FX.sound.tap(); render(); },
@@ -1157,7 +1423,7 @@
     liveCreate: async b => {
       b.disabled = true;
       const l = S().live;
-      const settings = { l: sel(), n: l.n, mode: l.mode, time: l.time, h: S().settings.harakat, seed: Math.floor(Math.random() * 2 ** 31) };
+      const settings = { l: sel(), n: l.n, mode: l.mode, time: l.time, adv: l.adv, h: S().settings.harakat, seed: Math.floor(Math.random() * 2 ** 31) };
       try { const c = await Cloud.createRoom(settings); openLive(c); } catch (e) { b.disabled = false; toast('Erreur : ' + e.message, 4000); }
     },
     liveJoin: async b => {
@@ -1172,7 +1438,32 @@
     liveSubmit: () => submitLive(false),
     liveRematch: () => Cloud.rematch(V.code, Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) })),
     liveQuit: () => { if (V.room && V.room.state === 'playing' && !confirm('Quitter la partie en cours ?')) return; history.replaceState(null, '', location.pathname); go('duel', { tab: 'live' }); },
-    video: () => { const r = V.room; window.open(`https://meet.jit.si/Murajaa-${V.code}-${(r && r.host ? r.host.slice(0, 6) : '')}`, '_blank', 'noopener'); },
+    livePause: () => { if (!V.room || V.paused) return; Cloud.pause(V.code, V.qi, liveLim() - (Date.now() - V.t0)).catch(e => toast(e.message)); },
+    liveResume: () => Cloud.resume(V.code).catch(e => toast(e.message)),
+    liveNext: b => { b.disabled = true; Cloud.advanceFrom(V.code, V.qi, V.qs.length).catch(e => { b.disabled = false; toast(e.message); }); },
+    homeLiveCreate: () => go('duel', { tab: 'live' }),
+    homeLiveJoin: () => {
+      const c = (document.getElementById('homeCode').value || '').trim().toUpperCase();
+      if (!Cloud.st.user || c.length < 4) { go('duel', { tab: 'live', joinCode: c }); if (c.length < 4) toast('Entre le code donné par ton binôme'); return; }
+      Cloud.joinRoom(c).then(() => openLive(c)).catch(e => toast(e.message, 4000));
+    },
+    // examen blanc
+    paperSec: b => { const s = S().paper.sections, k = b.dataset.k, i = s.indexOf(k); if (i >= 0) s.splice(i, 1); else s.push(k); S().paper.sections = Object.keys(Engine.SECTIONS).filter(x => s.includes(x)); Store.save(); render(); },
+    paperOpt: b => { S().paper[b.dataset.k] = parseV(b.dataset.v); Store.save(); render(); },
+    startPaper: () => startPaper(),
+    paperTab: b => { V.si = +b.dataset.i; render(); window.scrollTo(0, 0); },
+    ppick: b => { const q = V.secs.flatMap(s => s.qs).find(x => x.qid === b.dataset.q); (V.ans[q.qid] = V.ans[q.qid] || {})[b.dataset.f] = q.options[b.dataset.f][+b.dataset.k]; FX.sound.tap(); render(); },
+    submitPaper: () => submitPaper(false),
+    planCards: b => {
+      const s = V.result.secs.find(x => x.key === b.dataset.k);
+      const items = [...new Set(s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id]).filter(Boolean))];
+      const list = Engine.shuffle(Engine.cards(items, { dir: 'both', what: SEC_CATS[b.dataset.k] }));
+      if (!list.length) { toast('Rien à réviser ici'); return; }
+      V.done = false; go('flash', { mode: 'cram', q: list, i: 0, flip: false, n: 0, xp: 0, total: list.length, known: 0, unknown: 0, seen: {} });
+    },
+    planRedo: b => { const s = V.result.secs.find(x => x.key === b.dataset.k); const items = [...new Set(s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id]).filter(Boolean))]; V.done = false; startPaper(items, { sections: [s.key], size: 'all' }); },
+    redoWrong: () => { const items = [...new Set(V.result.secs.flatMap(s => s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id])).filter(Boolean))]; const secs = V.result.secs.filter(s => s.pct < 1).map(s => s.key); V.done = false; startPaper(items, { sections: secs, size: 'all' }); },
+    gameOpt: b => { S().game[b.dataset.k] = parseV(b.dataset.v); Store.save(); render(); },
     // mots
     openLesson: b => go('words', { lesson: b.dataset.id }),
     editItem: b => { V.edit = b.dataset.id; render(); },
@@ -1180,29 +1471,55 @@
     closeEdit: () => { V.edit = null; render(); },
     saveItem: () => {
       const data = {}; app.querySelectorAll('[data-ef]').forEach(i => { data[i.dataset.ef] = i.value.trim(); });
-      if (V.edit === 'new') {
-        const t = V.newType, hf = t === 'verb' ? 'madi' : 'w';
-        if (!data[hf]) { toast('Le mot arabe est obligatoire'); return; }
-        const arr = (S().custom[V.lesson] = S().custom[V.lesson] || []);
-        Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
-        arr.push(Object.assign({ id: 'c' + Date.now().toString(36), t }, data));
-      } else {
-        S().edits[V.edit] = Object.assign(S().edits[V.edit] || {}, data);
-      }
+      const it = LIB.items[V.edit];
+      const ul = it && userDeck(it.deckId) ? userDeck(it.deckId).lessons.find(l => l.id === it.lessonId) : null;
+      const raw = ul ? ul.items.find(x => x.id === it.id) : null;
+      if (raw) Object.assign(raw, data);                       // mot de mon paquet : modifié directement
+      else if (it && it.custom) S().edits[V.edit] = Object.assign(S().edits[V.edit] || {}, data);
+      else { toast('Les mots de la base ne se modifient pas'); return; }
       Store.save(); rebuild(); V.edit = null; toast('Enregistré'); render();
     },
-    delItem: () => { if (!confirm('Supprimer ce mot ?')) return; S().hidden[V.edit] = 1; Store.save(); rebuild(); V.edit = null; render(); },
-    newLesson: b => {
-      const title = prompt('Nom de la leçon :'); if (!title) return;
-      let d = S().decks.find(x => x.id === b.dataset.deck);
-      if (!d) { d = { id: b.dataset.deck, center: S().center, title: 'مُفْرَدَاتِي', subtitle: 'Mes mots perso', order: 999, user: true, lessons: [] }; S().decks.push(d); }
-      d.lessons.push({ id: d.id + '-' + Date.now().toString(36), title, items: [] });
-      Store.save(); rebuild(); render();
+    delItem: () => { if (!confirm('Supprimer ce mot ?')) return; deleteItems([V.edit]); V.edit = null; render(); },
+    selMode: () => { V.selMode = !V.selMode; V.picked = {}; render(); },
+    pickItem: b => { V.picked[b.dataset.id] = !V.picked[b.dataset.id]; render(); },
+    pickAll: () => { const L = LIB.lessons[V.lesson]; const all = L.items.every(it => V.picked[it.id]); L.items.forEach(it => { V.picked[it.id] = !all; }); render(); },
+    delPicked: () => {
+      const ids = Object.keys(V.picked).filter(k => V.picked[k]);
+      if (!ids.length || !confirm(`Supprimer ${ids.length} mot${ids.length > 1 ? 's' : ''} ?`)) return;
+      deleteItems(ids); V.picked = {}; V.selMode = false; toast('Supprimé'); render();
     },
-    exportLesson: b => {
-      const L = LIB.lessons[b.dataset.id], d = LIB.decks.find(x => x.id === L.deckId);
-      const items = L.items.map(({ id, lessonId, deckId, custom, ...rest }) => rest);
-      download(`${L.id}.json`, { id: d.id, center: d.center, title: d.title, subtitle: d.subtitle, lessons: [{ id: L.id, title: L.title, titleAr: L.titleAr, items }] });
+    renameDeck: b => { const d = userDeck(b.dataset.id); const t = prompt('Nouveau nom du paquet :', d.title); if (!t) return; d.title = t.trim(); Store.save(); rebuild(); render(); },
+    delDeck: b => {
+      const d = userDeck(b.dataset.id); const n = d.lessons.reduce((a, l) => a + (l.items || []).length, 0);
+      if (!confirm(`Supprimer le paquet « ${d.title} » et ses ${n} mots ? Ta progression sur ces mots sera effacée.`)) return;
+      deleteItems(d.lessons.flatMap(l => (l.items || []).map(it => it.id)));
+      S().decks = S().decks.filter(x => x.id !== d.id); Store.save(); rebuild(); render();
+    },
+    renameLesson: b => { const L = LIB.lessons[b.dataset.id], l = userDeck(L.deckId).lessons.find(x => x.id === L.id); const t = prompt('Nouveau nom de la page :', l.title); if (!t) return; l.title = t.trim(); Store.save(); rebuild(); render(); },
+    delLesson: b => {
+      const L = LIB.lessons[b.dataset.id], d = userDeck(L.deckId);
+      if (!confirm(`Supprimer la page « ${L.title} » (${L.items.length} mots) ?`)) return;
+      deleteItems(L.items.map(it => it.id)); d.lessons = d.lessons.filter(l => l.id !== L.id); Store.save(); rebuild(); go('words');
+    },
+    addToLesson: b => { const L = LIB.lessons[b.dataset.id]; S().center = deckOf(L).center; go('import', { imp: { deck: L.deckId, lesson: L.id, deckName: '', lessonName: '', text: '' } }); },
+    copyText: b => copy(Importer.toText(LIB.lessons[b.dataset.id].items)),
+    shareLesson: async b => {
+      if (!Cloud.st.user) { toast('Connecte-toi (Mon compte) pour partager un paquet', 3500); return; }
+      const L = LIB.lessons[b.dataset.id], d = userDeck(L.deckId), l = d.lessons.find(x => x.id === L.id);
+      try {
+        const c = await Cloud.share({ deck: { id: d.id, title: d.title, subtitle: d.subtitle, center: d.center }, lesson: l });
+        copy(c); toast(`Code de partage : ${c} (copié). Ton ami le colle dans « Ajouter des mots ».`, 7000);
+      } catch (e) { toast('Partage impossible : ' + e.message, 4000); }
+    },
+    impDeck: b => { V.imp.deck = b.dataset.id; V.imp.lesson = 'new'; render(); },
+    impLesson: b => { V.imp.lesson = b.dataset.id; render(); },
+    impExample: () => { V.imp.text = (V.imp.text ? V.imp.text.trim() + '\n' : '') + Importer.EXAMPLE; render(); },
+    impSave: () => importSave(),
+    impCode: async () => {
+      const c = (document.getElementById('shareCode').value || '').trim();
+      if (c.length < 4) { toast('Entre le code de partage'); return; }
+      if (!Cloud.st.user) { toast('Connecte-toi (Mon compte) pour importer avec un code', 3500); return; }
+      try { const l = addSharedPack(await Cloud.getShared(c)); toast(`Page « ${l.title} » importée`); go('words', { lesson: l.id }); } catch (e) { toast(e.message, 4000); }
     },
     setting: b => { S().settings[b.dataset.k] = b.dataset.v; Store.save(); applyTheme(); render(); },
     exportAll: () => download(`murajaa-sauvegarde-${Store.today()}.json`, S()),
@@ -1248,8 +1565,29 @@
     const fn = A[b.dataset.a]; if (fn) fn(b, e);
   });
   app.addEventListener('change', e => { const b = e.target.closest('[data-a]'); if (b && CHANGE[b.dataset.a]) CHANGE[b.dataset.a](b, e); });
+  // saisie : réponses de l'examen blanc, liste de mots à importer
+  let prevT = null;
+  app.addEventListener('input', e => {
+    const t = e.target;
+    if (t.classList.contains('pin') && V.name === 'paper') {
+      (V.ans[t.dataset.q] = V.ans[t.dataset.q] || {})[t.dataset.f] = t.value;
+      const done = V.answered(), total = V.secs.reduce((a, s) => a + s.qs.length, 0);
+      const pb = app.querySelector('.stop .prog b'), c = app.querySelector('.stop .cnt');
+      if (pb) pb.style.width = Math.round(done / total * 100) + '%'; if (c) c.textContent = `${done}/${total}`;
+    } else if (V.name === 'import' && V.imp) {
+      if (t.id === 'impText') {
+        V.imp.text = t.value;
+        clearTimeout(prevT); prevT = setTimeout(() => { const p = document.getElementById('impPrev'), n = document.getElementById('impCount'); if (p) p.innerHTML = importPreview(); if (n) n.innerHTML = importCount(); }, 250);
+      } else if (t.classList.contains('impf')) V.imp[t.dataset.k] = t.value;
+    }
+  });
 
   function onEnter(target) {
+    if (V.name === 'paper' && target && target.classList && target.classList.contains('pin')) {
+      const ins = [...app.querySelectorAll('.pin')], i = ins.indexOf(target);
+      if (i < ins.length - 1) ins[i + 1].focus(); else target.blur();
+      return;
+    }
     const live = V.name === 'live' && V.room && V.room.state === 'playing' && !V.sent;
     if ((V.name === 'exam' && !V.over) || live) {
       if (V.name === 'exam' && V.phase === 'fb') return examNext();
@@ -1267,7 +1605,7 @@
       if (e.key === ' ' || (e.key === 'Enter' && V.mode === 'srs' && !V.flip)) { e.preventDefault(); if (V.mode === 'srs' && V.flip) return; flip(); }
       else if (V.mode === 'srs' && V.flip && '1234'.includes(e.key)) { e.preventDefault(); grade(+e.key); }
       else if (V.mode === 'cram' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) { e.preventDefault(); cram(e.key === 'ArrowRight'); }
-    } else if ((V.name === 'exam' || V.name === 'live') && e.key === 'Enter') { e.preventDefault(); onEnter(e.target); }
+    } else if ((V.name === 'exam' || V.name === 'live' || V.name === 'paper') && e.key === 'Enter') { if (V.name !== 'paper' || typing) { e.preventDefault(); onEnter(e.target); } }
     else if ((V.name === 'rush' || V.name === 'rain') && !V.over && !typing && '1234'.includes(e.key)) (V.name === 'rush' ? rushPick : rainResolve)(+e.key - 1);
     else if (V.name === 'tf' && !V.over && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); tfPick(e.key === 'ArrowRight' ? 1 : 0); }
     else if (V.name === 'anagram' && !V.over && e.key === 'Backspace' && !typing) { e.preventDefault(); A.anaBack(); }

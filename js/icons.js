@@ -47,6 +47,14 @@ const ICONS = {
   skip: '<path d="m5 5 9 7-9 7Z"/><path d="M19 5v14"/>',
   building: '<path d="M3 21h18M5 21V8l7-5 7 5v13"/><path d="M9 21v-5h6v5M9 11h.01M15 11h.01"/>',
   sound: '<path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>',
+  mic: '<rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5"/>',
+  micoff: '<path d="M15 10V5.5a3 3 0 0 0-5.7-1.3M9 9v2a3 3 0 0 0 4.9 2.3"/><path d="M5 11a7 7 0 0 0 11.6 5.3M19 11a7 7 0 0 1-.6 2.8M12 18v3.5M3 3l18 18"/>',
+  camoff: '<path d="M16 16v1.5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2M10 6h4a2 2 0 0 1 2 2v3.5l6-3.5v10"/><path d="M3 3l18 18"/>',
+  phone: '<path d="M3.5 14.5c5-5 12-5 17 0l-2.3 2.3a1.2 1.2 0 0 1-1.6.1l-2.1-1.6a1.2 1.2 0 0 1-.4-1.3l.5-1.6a10 10 0 0 0-5.2 0l.5 1.6a1.2 1.2 0 0 1-.4 1.3L7.4 17a1.2 1.2 0 0 1-1.6-.1Z"/>',
+  headset: '<path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/>',
+  pause: '<rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/>',
+  play: '<path d="M7 4.5v15l12-7.5Z"/>',
+  minus: '<path d="M5 12h14"/>',
   heart: '<path d="M12 20s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 7.2a4.2 4.2 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20Z"/>'
 };
 const ico = (name, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
