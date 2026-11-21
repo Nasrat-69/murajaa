@@ -596,6 +596,7 @@ details { border-bottom: 1px solid var(--line); padding: 6px 0; } summary { curs
 .fmt summary { font-weight: 700; color: var(--primary); }
 .fmt-t { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: .86rem; }
 .fmt-t td { padding: 4px 6px; border-bottom: 1px solid var(--line); } .fmt-t td:first-child { color: var(--muted); white-space: nowrap; }
+.fmt-l { font-family: var(--ar-font), var(--ui-font); font-size: 1.05rem; unicode-bidi: plaintext; text-align: start; }
 #impText { font-family: var(--ar-font), var(--ui-font); font-size: 1.2rem; line-height: 1.9; resize: vertical; margin-bottom: 8px; unicode-bidi: plaintext; text-align: start; }
 .impf { margin-top: 10px; }
 .prev { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; max-height: 360px; overflow: auto; }

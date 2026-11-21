@@ -1,6 +1,26 @@
 /* Traductions de l'interface : [français, anglais, russe]. {n} = un nombre. */
 (() => {
   const T = [
+    ["Plusieurs prépositions", "Several prepositions", "Несколько предлогов"],
+    ["Règles : l'arabe d'abord, puis le signe = et la traduction. Les formes d'un verbe sont séparées par /. Le pluriel va entre ( ). Les infos en plus se mettent après |. Tu peux aussi coller des colonnes depuis Excel ou Google Sheets.",
+     "Rules: Arabic first, then the = sign and the translation. A verb's forms are separated by /. The plural goes between ( ). Extra info goes after |. You can also paste columns from Excel or Google Sheets.",
+     "Правила: сначала арабский, затем знак = и перевод. Формы глагола разделяются /. Множественное число — в ( ). Дополнительное — после |. Можно вставлять и столбцы из Excel или Google Таблиц."],
+    // « texte » à la place de « page »
+    ["{n} textes", "{n} texts", "{n} текст."], ["{n} texte", "{n} text", "{n} текст"], ["Texte {n}", "Text {n}", "Текст {n}"], ["Texte", "Text", "Текст"],
+    ["Ajouter un niveau ou un texte", "Add a level or a text", "Добавить уровень или текст"],
+    ["Tu choisis tout : les textes, le type de question, les cartes et la façon de réviser.", "You choose everything: texts, question type, cards and how to review.", "Ты выбираешь всё: тексты, тип вопросов, карточки и способ повторения."],
+    ["Quels textes ?", "Which texts?", "Какие тексты?"], ["Sur quels textes ?", "Which texts?", "По каким текстам?"],
+    ["Passe au texte suivant ou fais un examen plus long.", "Every section is above 75%. Move on to the next text or take a longer exam.", "Переходи к следующему тексту или пройди экзамен подлиннее."],
+    ["Toutes les parties sont au-dessus de 75 %. Passe au texte suivant ou fais un examen plus long.", "Every section is above 75%. Move on to the next text or take a longer exam.", "Все разделы выше 75 %. Переходи к следующему тексту или пройди экзамен подлиннее."],
+    ["Chaque jeu se règle : centre, niveau, textes et type de question.", "Each game can be set up: centre, level, texts and question type.", "Каждую игру можно настроить: центр, уровень, тексты и тип вопросов."],
+    ["Maîtrise par texte", "Mastery by text", "Освоение по текстам"], ["Aucun texte.", "No texts.", "Нет текстов."],
+    ["Réviser ce texte", "Review this text", "Повторить текст"], ["Renommer le texte", "Rename text", "Переименовать текст"], ["Supprimer le texte", "Delete text", "Удалить текст"],
+    ["Nouveau texte", "New text", "Новый текст"], ["Nom du texte (ex. Texte {n} · À l'aéroport)", "Text name (e.g. Text {n} · At the airport)", "Название текста (напр. Текст {n} · В аэропорту)"],
+    ["Ton ami ouvre son texte, clique sur « Partager » et te donne le code.", "Your friend opens their text, clicks \"Share\" and gives you the code.", "Друг открывает свой текст, нажимает «Поделиться» и даёт тебе код."],
+    ["Nouveau nom du texte :", "New text name:", "Новое название текста:"],
+    ["Choisis le centre, le niveau, les textes, le type de question, le sens et le mode.", "Choose the centre, level, texts, question type, direction and mode.", "Выбери центр, уровень, тексты, тип вопросов, направление и режим."],
+    ["0 mot", "0 words", "0 слов"], ["0 mot prêt", "0 words ready", "готово слов: 0"], ["0 carte", "0 cards", "0 карточек"], ["0 sélectionné", "0 selected", "выбрано: 0"], ["0 texte", "0 texts", "0 текстов"],
+    ["0 erreur", "0 mistakes", "0 ошибок"], ["0 victoire", "0 wins", "0 побед"], ["0 nul", "0 draws", "0 ничьих"], ["0 défaite", "0 losses", "0 поражений"], ["0 partie", "0 games", "0 игр"], ["0 jour", "0 days", "0 дней"],
     // navigation, général
     ["Murājaʿa", "Murājaʿa", "Murājaʿa"],
     ["Accueil", "Home", "Главная"], ["Réviser", "Review", "Повторять"], ["Examen", "Exam", "Экзамен"], ["Jeux", "Games", "Игры"], ["Mots", "Words", "Слова"],
@@ -237,6 +257,8 @@
   // phrases avec un nom ou un titre
   const P = (fr, e, r) => [[fr, e], [fr, r]];
   const pats = [
+    P(/^Supprimer le texte « (.+) » \((\d+) mots\) \?$/, 'Delete the text "$1" ($2 words)?', 'Удалить текст «$1» ($2 слов)?'),
+    P(/^Texte « (.+) » importé$/, 'Text "$1" imported', 'Текст «$1» импортирован'),
     P(/^Bonjour (.+)$/, 'Hello $1', 'Привет, $1'),
     P(/^(.+) mène de (\d+)$/, '$1 leads by $2', '$1 впереди на $2'),
     P(/^Tu mènes de (\d+)$/, 'You lead by $1', 'Ты впереди на $1'),

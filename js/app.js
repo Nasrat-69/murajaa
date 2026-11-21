@@ -222,10 +222,10 @@
         const items = d.lessons.flatMap(l => l.items);
         const m = items.length ? items.reduce((a, it) => a + Engine.mastery(it), 0) / items.length : 0;
         return `<div class="dcard"><div class="dcard-h">${ar(d.title, 'md')}<span class="dpct">${Math.round(m * 100)} %</span></div>
-          <small class="muted">${esc(d.subtitle || '')} · ${d.lessons.length} pages · ${items.length} mots</small>${bar(m)}
+          <small class="muted">${esc(d.subtitle || '')} · ${d.lessons.length} textes · ${items.length} mots</small>${bar(m)}
           <div class="row wrap"><button class="btn sm primary" data-a="reviseDeck" data-id="${esc(d.id)}">Réviser ce niveau</button><button class="btn sm ghost" data-a="go" data-to="words">Voir les mots</button></div></div>`;
       }).join('')}
-        <button class="dcard soon" data-a="go" data-to="import"><b>${ico('plus')} Ajouter un niveau ou une page</b><small class="muted">Colle simplement ta liste de mots, une ligne par mot.</small></button></div>` : emptyCenter()}`;
+        <button class="dcard soon" data-a="go" data-to="import"><b>${ico('plus')} Ajouter un niveau ou un texte</b><small class="muted">Colle simplement ta liste de mots, une ligne par mot.</small></button></div>` : emptyCenter()}`;
   };
 
   /* ----- Réviser : réglages ----- */
@@ -245,8 +245,8 @@
     const r = S().rev, items = Engine.itemsFor(sel()), cards = Engine.cards(items, r);
     const cnt = Engine.countWhich(cards), avail = cnt[r.which] || 0;
     const n = r.which === 'due' || r.n === 'all' ? avail : Math.min(avail, r.n);
-    return `<div class="page-h"><h1>Réviser</h1><p class="muted">Tu choisis tout : les pages, le type de question, les cartes et la façon de réviser.</p></div>
-      <section class="panel"><h2 class="step"><i>1</i>Quelles pages ?</h2>${picker()}</section>
+    return `<div class="page-h"><h1>Réviser</h1><p class="muted">Tu choisis tout : les textes, le type de question, les cartes et la façon de réviser.</p></div>
+      <section class="panel"><h2 class="step"><i>1</i>Quels textes ?</h2>${picker()}</section>
       <section class="panel"><h2 class="step"><i>2</i>Type de question</h2>${whatChips(r.what, 'revWhat')}
         <h3>Sens</h3>${seg('revOpt', 'dir', [['ar', 'Arabe → Français'], ['fr', 'Français → Arabe'], ['both', 'Les deux']], r.dir)}
         <p class="muted small">Pour le pluriel, les contraires et les synonymes : « Arabe → Français » va du mot vers sa forme, l'autre sens fait l'inverse.</p></section>
@@ -386,7 +386,7 @@
     const per = p.size === 'all' ? 25 : p.size;
     const total = p.sections.reduce((a, k) => a + Math.min(Engine.sectionCount(k, items), per), 0);
     return `<div class="page-h"><h1>Examen blanc</h1><p class="muted">Comme le jour de l'examen : une copie en plusieurs parties, sans aide ni correction pendant l'épreuve. À la fin, tu as ta note, la correction détaillée et un plan de révision.</p></div>
-      <section class="panel"><h2 class="step"><i>1</i>Sur quelles pages ?</h2>${picker()}</section>
+      <section class="panel"><h2 class="step"><i>1</i>Sur quels textes ?</h2>${picker()}</section>
       <section class="panel"><h2 class="step"><i>2</i>Parties de l'examen</h2>
         <div class="wchips">${Object.entries(Engine.SECTIONS).map(([k, s]) => {
           const n = Engine.sectionCount(k, items), on = p.sections.includes(k);
@@ -500,7 +500,7 @@
       ${weak.length ? `<section class="panel plan"><h2>${ico('target', 'red')} Ton plan de révision</h2><p class="muted small">Les parties sous 75 % : entraîne-toi d'abord sur les mots ratés.</p>
         ${weak.map(s => { const wr = s.qs.filter(x => !x.ok).map(x => x.q.item.id); return `<div class="planrow"><div><b>${esc(s.title)}</b><small class="muted">${wr.length} erreur${wr.length > 1 ? 's' : ''} · ${Math.round(s.pct * 100)} %</small></div>
           <div class="row wrap"><button class="btn sm" data-a="planCards" data-k="${s.key}">${ico('zap')}Réviser ces mots</button><button class="btn sm ghost" data-a="planRedo" data-k="${s.key}">${ico('repeat')}Refaire la partie</button></div></div>`; }).join('')}</section>`
-        : `<section class="panel plan"><h2>${ico('trophy')} Rien à rattraper</h2><p class="muted small">Toutes les parties sont au-dessus de 75 %. Passe à une page suivante ou fais un examen plus long.</p></section>`}
+        : `<section class="panel plan"><h2>${ico('trophy')} Rien à rattraper</h2><p class="muted small">Toutes les parties sont au-dessus de 75 %. Passe au texte suivant ou fais un examen plus long.</p></section>`}
       <div class="row wrap center">${wrongAll.length ? `<button class="btn primary" data-a="redoWrong">${ico('repeat')}Refaire toutes mes erreurs (${wrongAll.length})</button>` : ''}<button class="btn" data-a="go" data-to="examSetup">Nouvel examen</button><button class="btn ghost" data-a="go" data-to="home">Accueil</button></div>
       <h2 class="sec">Correction détaillée</h2>
       ${R.secs.map((s, si) => `<section class="panel corr"><h3>Partie ${si + 1} · ${esc(s.title)}</h3>
@@ -631,7 +631,7 @@
   function gameCard(k, g, small) {
     return `<button class="gcard ${small ? 'small' : ''}" style="--c:${g.c}" data-a="openGame" data-v="${k}"><span class="gi">${ico(g.icon)}</span><b>${g.name}</b>${small ? '' : `<small>${esc(g.desc)}</small>`}<span class="best">${ico('trophy')}${S().best[k] || 0}</span></button>`;
   }
-  VIEWS.games = () => `<div class="page-h"><h1>Jeux</h1><p class="muted">Chaque jeu se règle : centre, niveau, pages et type de question.</p></div>
+  VIEWS.games = () => `<div class="page-h"><h1>Jeux</h1><p class="muted">Chaque jeu se règle : centre, niveau, textes et type de question.</p></div>
     <button class="livebanner" data-a="go" data-to="duel"><span class="gi">${ico('live')}</span><div><b>Duel en direct</b><small>Jouez en même temps, question par question, avec un chrono. Idéal pendant un appel vidéo.</small></div>${ico('chevron')}</button>
     <div class="ggrid">${Object.entries(GAMES).map(([k, g]) => gameCard(k, g)).join('')}
       <button class="gcard" style="--c:var(--c-boss)" data-a="startBoss"><span class="gi">${ico('crown')}</span><b>Boss de leçon</b><small>Examen à écrire sur toute la sélection. 3 vies, pas une de plus.</small></button>
@@ -1152,7 +1152,7 @@
       <section class="panel"><h2>Où en sont tes mots</h2>
         <div class="stack">${[['m', mastered, 'Maîtrisés'], ['lr', learning, 'En cours'], ['f', fresh, 'Pas encore vus']].map(([c, v, l]) => v ? `<b class="${c}" style="flex:${v}" data-tip="${l} : ${v} mots (${Math.round(v / tot * 100)} %)"></b>` : '').join('')}</div>
         <div class="legend"><span><i class="m"></i>Maîtrisés · ${mastered}</span><span><i class="lr"></i>En cours · ${learning}</span><span><i class="f"></i>Pas encore vus · ${fresh}</span></div></section>
-      <section class="panel"><h2>Maîtrise par page</h2>${centerDecks().flatMap(d => d.lessons).map(l => { const m = Engine.lessonMastery(l); return `<div class="mrow"><span>${esc(l.title)}</span>${bar(m)}<b>${Math.round(m * 100)} %</b></div>`; }).join('') || '<p class="muted">Aucune page.</p>'}</section>
+      <section class="panel"><h2>Maîtrise par texte</h2>${centerDecks().flatMap(d => d.lessons).map(l => { const m = Engine.lessonMastery(l); return `<div class="mrow"><span>${esc(l.title)}</span>${bar(m)}<b>${Math.round(m * 100)} %</b></div>`; }).join('') || '<p class="muted">Aucun texte.</p>'}</section>
       ${hard.length ? `<section class="panel"><h2>Mots les plus difficiles</h2>${hard.map(it => { const r = S().items[it.id]; return `<div class="mrow"><span>${ar(Engine.head(it), 'sm')} <small class="muted">${esc(it.fr)}</small></span><span class="muted small">${r.err} erreur${r.err > 1 ? 's' : ''} · ${r.ok} juste${r.ok > 1 ? 's' : ''}</span></div>`; }).join('')}</section>` : ''}
       ${Object.keys(S().rivals).length ? `<section class="panel"><div class="row between"><h2>Face à face</h2><button class="link" data-a="openRivals">Voir le bilan</button></div>
         ${Object.values(S().rivals).map(rv => `<div class="mrow"><span class="row">${avatar(rv, 'sm')}${esc(rv.name)}</span><span class="wld"><span class="w">${rv.w}</span><span class="d">${rv.d}</span><span class="l">${rv.l}</span></span></div>`).join('')}</section>` : ''}`;
@@ -1190,9 +1190,9 @@
       <button class="addbig" data-a="goImport">${ico('plus')}<div><b>Ajouter des mots</b><small>Colle ta liste, une ligne par mot. Ou importe le paquet d'un ami avec son code.</small></div>${ico('chevron')}</button>
       ${base.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')}</small></div><span class="lock">${ico('check')}Base officielle</span></div>${d.lessons.map(lrow).join('')}</section>`).join('')}
       <h2 class="sec">Mes paquets</h2>
-      ${mine.length ? mine.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t"><b class="dname">${esc(d.title)}</b><small>${d.lessons.length} page${d.lessons.length > 1 ? 's' : ''}</small></div>
+      ${mine.length ? mine.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t"><b class="dname">${esc(d.title)}</b><small>${d.lessons.length} texte${d.lessons.length > 1 ? 's' : ''}</small></div>
           <div class="row"><button class="btn sm ghost" data-a="renameDeck" data-id="${esc(d.id)}">Renommer</button><button class="btn sm ghost danger-t" data-a="delDeck" data-id="${esc(d.id)}">Supprimer</button></div></div>
-        ${d.lessons.map(lrow).join('') || '<p class="muted small">Aucune page.</p>'}</section>`).join('')
+        ${d.lessons.map(lrow).join('') || '<p class="muted small">Aucun texte.</p>'}</section>`).join('')
         : `<section class="panel empty">${ico('book', 'big')}<h3>Aucun paquet perso</h3><p class="muted">Ajoute tes propres mots : ils s'ajoutent à la base, sans la modifier.</p></section>`}
       ${!decks.length ? emptyCenter() : ''}`;
   };
@@ -1209,14 +1209,14 @@
     const nPicked = Object.values(picked).filter(Boolean).length;
     return `<button class="link back" data-a="go" data-to="words">${ico('back')}Mots</button>
       <div class="page-h"><h1>${esc(L.title)} ${ar(L.titleAr || '', 'md')}</h1><p class="muted small">${own ? `Mon paquet « ${esc(d.title)} »` : `${ico('check')} Base officielle : non modifiable`} · ${L.items.length} mots</p></div>
-      <div class="row wrap"><button class="btn primary" data-a="lessonReview" data-id="${esc(L.id)}">${ico('cards')}Réviser cette page</button><button class="btn" data-a="lessonExam" data-id="${esc(L.id)}">${ico('exam')}Examen blanc</button>
+      <div class="row wrap"><button class="btn primary" data-a="lessonReview" data-id="${esc(L.id)}">${ico('cards')}Réviser ce texte</button><button class="btn" data-a="lessonExam" data-id="${esc(L.id)}">${ico('exam')}Examen blanc</button>
         <button class="btn ghost" data-a="copyText" data-id="${esc(L.id)}">${ico('copy')}Copier en texte</button>
         ${own ? `<button class="btn ghost" data-a="shareLesson" data-id="${esc(L.id)}">${ico('link')}Partager</button>` : ''}</div>
       ${own ? `<div class="selbar">${selOn
         ? `<button class="btn sm" data-a="pickAll">Tout sélectionner</button><span class="muted small">${nPicked} sélectionné${nPicked > 1 ? 's' : ''}</span>
            <button class="btn sm danger" data-a="delPicked" ${nPicked ? '' : 'disabled'}>Supprimer</button><button class="btn sm ghost" data-a="selMode">Terminer</button>`
         : `<button class="btn sm" data-a="selMode">${ico('check')}Sélectionner plusieurs mots</button><button class="btn sm" data-a="addToLesson" data-id="${esc(L.id)}">${ico('plus')}Ajouter des mots</button>
-           <button class="btn sm ghost" data-a="renameLesson" data-id="${esc(L.id)}">Renommer la page</button><button class="btn sm ghost danger-t" data-a="delLesson" data-id="${esc(L.id)}">Supprimer la page</button>`}</div>` : ''}
+           <button class="btn sm ghost" data-a="renameLesson" data-id="${esc(L.id)}">Renommer le texte</button><button class="btn sm ghost danger-t" data-a="delLesson" data-id="${esc(L.id)}">Supprimer le texte</button>`}</div>` : ''}
       <div class="wlist">${rows || '<p class="muted">Aucun mot.</p>'}</div>
       ${V.edit ? editModal() : ''}`;
   }
@@ -1258,24 +1258,18 @@
         <h3>Paquet</h3><div class="pchips">${mine.map(x => `<button class="pchip ${im.deck === x.id ? 'on' : ''}" data-a="impDeck" data-id="${esc(x.id)}">${esc(x.title)}</button>`).join('')}
           <button class="pchip ${im.deck === 'new' ? 'on' : ''}" data-a="impDeck" data-id="new">${ico('plus')}Nouveau paquet</button></div>
         ${im.deck === 'new' ? `<input class="impf" data-k="deckName" placeholder="Nom du paquet (ex. Mustawa 1, Al-Furqan niveau 2…)" value="${esc(im.deckName)}">` : ''}
-        <h3>Page</h3><div class="pchips">${(d ? d.lessons : []).map(l => `<button class="pchip ${im.lesson === l.id ? 'on' : ''}" data-a="impLesson" data-id="${esc(l.id)}">${esc(l.title)}</button>`).join('')}
-          <button class="pchip ${im.lesson === 'new' ? 'on' : ''}" data-a="impLesson" data-id="new">${ico('plus')}Nouvelle page</button></div>
-        ${im.lesson === 'new' ? `<input class="impf" data-k="lessonName" placeholder="Nom de la page (ex. Leçon 3 · Verbes)" value="${esc(im.lessonName)}">` : ''}</section>
+        <h3>Texte</h3><div class="pchips">${(d ? d.lessons : []).map(l => `<button class="pchip ${im.lesson === l.id ? 'on' : ''}" data-a="impLesson" data-id="${esc(l.id)}">${esc(l.title)}</button>`).join('')}
+          <button class="pchip ${im.lesson === 'new' ? 'on' : ''}" data-a="impLesson" data-id="new">${ico('plus')}Nouveau texte</button></div>
+        ${im.lesson === 'new' ? `<input class="impf" data-k="lessonName" placeholder="Nom du texte (ex. Texte 3 · À l'aéroport)" value="${esc(im.lessonName)}">` : ''}</section>
       <section class="panel"><h2 class="step"><i>2</i>Tes mots</h2>
         <details class="fmt"><summary>${ico('hint')} Comment écrire ? (exemples)</summary>
-          <table class="fmt-t">
-            <tr><td>Verbe</td><td dir="rtl" class="ar sm">ذَهَبَ / يَذْهَبُ / اِذْهَبْ / ذَهَابًا = aller</td></tr>
-            <tr><td>Verbe + préposition</td><td dir="rtl" class="ar sm">ذَهَبَ / يَذْهَبُ + إِلَى = aller</td></tr>
-            <tr><td>Nom + pluriel</td><td dir="rtl" class="ar sm">مَطَارٌ (مَطَارَاتٌ) = aéroport</td></tr>
-            <tr><td>Avec un contraire</td><td dir="rtl" class="ar sm">كَبِيرٌ = grand | contraire: صَغِيرٌ</td></tr>
-            <tr><td>Avec synonyme et phrase</td><td dir="rtl" class="ar sm">طَالِبٌ = étudiant | synonyme: تِلْمِيذٌ | phrase: الطَّالِبُ جَدِيدٌ</td></tr>
-          </table>
-          <p class="muted small">Règles : l'arabe à gauche du signe <b>=</b>, le français à droite. Les formes d'un verbe sont séparées par <b>/</b>. Le pluriel va entre <b>( )</b>. Les infos en plus se mettent après <b>|</b>. Tu peux aussi coller directement des colonnes depuis Excel ou Google Sheets.</p></details>
+          <table class="fmt-t">${Importer.helpLines().map(([l, x]) => `<tr><td>${esc(l)}</td><td class="fmt-l noi18n">${esc(x)}</td></tr>`).join('')}</table>
+          <p class="muted small">Règles : l'arabe d'abord, puis le signe = et la traduction. Les formes d'un verbe sont séparées par /. Le pluriel va entre ( ). Les infos en plus se mettent après |. Tu peux aussi coller des colonnes depuis Excel ou Google Sheets.</p></details>
         <textarea id="impText" rows="9" placeholder="${esc(Importer.EXAMPLE)}">${esc(im.text)}</textarea>
         <div class="row wrap"><button class="btn sm ghost" data-a="impExample">Insérer un exemple</button></div>
         <div id="impPrev">${importPreview()}</div></section>
       <div class="cta-bar"><div class="cta-info" id="impCount">${importCount()}</div><button class="btn primary lg" data-a="impSave">Ajouter</button></div>
-      <section class="panel"><h2>Importer le paquet d'un ami</h2><p class="muted small">Ton ami ouvre sa page, clique sur « Partager » et te donne le code.</p>
+      <section class="panel"><h2>Importer le paquet d'un ami</h2><p class="muted small">Ton ami ouvre son texte, clique sur « Partager » et te donne le code.</p>
         <div class="row"><input id="shareCode" class="codein" placeholder="CODE" maxlength="5" autocapitalize="characters"><button class="btn primary" data-a="impCode">Importer</button></div>
         <label class="link">${ico('download')}ou importer un fichier .json<input type="file" accept=".json,application/json" data-a="importDeck" hidden></label></section>`;
   };
@@ -1297,7 +1291,7 @@
     let d = im.deck === 'new' ? null : userDeck(im.deck);
     if (!d) { d = { id: 'u' + rid(), center: S().center, title: im.deckName.trim() || 'Mes mots', subtitle: 'Mon paquet', order: 500, user: true, lessons: [] }; S().decks.push(d); }
     let l = im.lesson === 'new' ? null : d.lessons.find(x => x.id === im.lesson);
-    if (!l) { l = { id: d.id + '-' + rid(), title: im.lessonName.trim() || `Page ${d.lessons.length + 1}`, items: [] }; d.lessons.push(l); }
+    if (!l) { l = { id: d.id + '-' + rid(), title: im.lessonName.trim() || `Texte ${d.lessons.length + 1}`, items: [] }; d.lessons.push(l); }
     rows.forEach(r => l.items.push(Object.assign({ id: 'w' + rid() }, r.item)));
     Store.save(); rebuild(); V.imp = null;
     toast(`${rows.length} mot${rows.length > 1 ? 's' : ''} ajouté${rows.length > 1 ? 's' : ''}`);
@@ -1519,10 +1513,10 @@
       deleteItems(d.lessons.flatMap(l => (l.items || []).map(it => it.id)));
       S().decks = S().decks.filter(x => x.id !== d.id); Store.save(); rebuild(); render();
     },
-    renameLesson: b => { const L = LIB.lessons[b.dataset.id], l = userDeck(L.deckId).lessons.find(x => x.id === L.id); const t = prompt('Nouveau nom de la page :', l.title); if (!t) return; l.title = t.trim(); Store.save(); rebuild(); render(); },
+    renameLesson: b => { const L = LIB.lessons[b.dataset.id], l = userDeck(L.deckId).lessons.find(x => x.id === L.id); const t = prompt('Nouveau nom du texte :', l.title); if (!t) return; l.title = t.trim(); Store.save(); rebuild(); render(); },
     delLesson: b => {
       const L = LIB.lessons[b.dataset.id], d = userDeck(L.deckId);
-      if (!confirm(`Supprimer la page « ${L.title} » (${L.items.length} mots) ?`)) return;
+      if (!confirm(`Supprimer le texte « ${L.title} » (${L.items.length} mots) ?`)) return;
       deleteItems(L.items.map(it => it.id)); d.lessons = d.lessons.filter(l => l.id !== L.id); Store.save(); rebuild(); go('words');
     },
     addToLesson: b => { const L = LIB.lessons[b.dataset.id]; S().center = deckOf(L).center; go('import', { imp: { deck: L.deckId, lesson: L.id, deckName: '', lessonName: '', text: '' } }); },
@@ -1543,7 +1537,7 @@
       const c = (document.getElementById('shareCode').value || '').trim();
       if (c.length < 4) { toast('Entre le code de partage'); return; }
       if (!Cloud.st.user) { toast('Connecte-toi (Mon compte) pour importer avec un code', 3500); return; }
-      try { const l = addSharedPack(await Cloud.getShared(c)); toast(`Page « ${l.title} » importée`); go('words', { lesson: l.id }); } catch (e) { toast(e.message, 4000); }
+      try { const l = addSharedPack(await Cloud.getShared(c)); toast(`Texte « ${l.title} » importé`); go('words', { lesson: l.id }); } catch (e) { toast(e.message, 4000); }
     },
     setting: b => { S().settings[b.dataset.k] = b.dataset.v; Store.save(); applyTheme(); render(); },
     exportAll: () => download(`murajaa-sauvegarde-${Store.today()}.json`, S()),

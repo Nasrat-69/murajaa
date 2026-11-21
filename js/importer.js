@@ -111,12 +111,27 @@ const Importer = (() => {
     ru: ['идти', 'аэропорт', 'большой | антоним', 'студент | синоним', 'пример']
   };
   const example = () => {
-    const w = EX[(window.I18N && I18N.lang) || 'fr'] || EX.fr;
+    const w = EX[(typeof I18N !== 'undefined' && I18N.lang) || 'fr'] || EX.fr;
     return `ذَهَبَ / يَذْهَبُ / اِذْهَبْ / ذَهَابًا + إِلَى = ${w[0]}
 مَطَارٌ (مَطَارَاتٌ) = ${w[1]}
 كَبِيرٌ = ${w[2]}: صَغِيرٌ
 طَالِبٌ (طُلَّابٌ) = ${w[3]}: تِلْمِيذٌ | ${w[4]}: الطَّالِبُ جَدِيدٌ`;
   };
 
-  return { parse, parseLine, toText, toLine, get EXAMPLE() { return example(); } };
+  // lignes d'exemple de l'aide, dans la langue choisie
+  const KW = { fr: ['harf', 'contraire', 'synonyme', 'phrase'], en: ['harf', 'opposite', 'synonym', 'sentence'], ru: ['предлог', 'антоним', 'синоним', 'пример'] };
+  const helpLines = () => {
+    const l = (typeof I18N !== 'undefined' && I18N.lang) || 'fr', w = EX[l] || EX.fr, k = KW[l] || KW.fr;
+    const tr = { fr: ['aller', 'aéroport', 'grand', 'étudiant', 'revenir', 'revenir à', 'revenir de'], en: ['to go', 'airport', 'big', 'student', 'to come back', 'return to', 'come back from'], ru: ['идти', 'аэропорт', 'большой', 'студент', 'возвращаться', 'вернуться в', 'вернуться из'] }[l] || [];
+    return [
+      ['Verbe', `ذَهَبَ / يَذْهَبُ / اِذْهَبْ / ذَهَابًا = ${tr[0]}`],
+      ['Verbe + préposition', `ذَهَبَ / يَذْهَبُ + إِلَى = ${tr[0]}`],
+      ['Plusieurs prépositions', `رَجَعَ / يَرْجِعُ = ${tr[4]} | ${k[0]}: إِلَى = ${tr[5]} / مِنْ = ${tr[6]}`],
+      ['Nom + pluriel', `مَطَارٌ (مَطَارَاتٌ) = ${tr[1]}`],
+      ['Avec un contraire', `كَبِيرٌ = ${tr[2]} | ${k[1]}: صَغِيرٌ`],
+      ['Avec synonyme et phrase', `طَالِبٌ = ${tr[3]} | ${k[2]}: تِلْمِيذٌ | ${k[3]}: الطَّالِبُ جَدِيدٌ`]
+    ];
+  };
+
+  return { parse, parseLine, toText, toLine, helpLines, get EXAMPLE() { return example(); } };
 })();
