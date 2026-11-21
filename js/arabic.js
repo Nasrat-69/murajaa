@@ -80,8 +80,8 @@ const AR = (() => {
   /* ---- français ---- */
   function normFr(s) {
     return String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/[’'`]/g, ' ').replace(/[^a-z0-9 ]+/g, ' ')
-      .replace(/\b(le|la|les|l|un|une|des|du|de|d|se|s|en|a|to|the)\b/g, ' ')
+      .replace(/[’'`]/g, ' ').replace(/[^\p{L}\p{N} ]+/gu, ' ')
+      .replace(/(^|\s)(le|la|les|l|un|une|des|du|de|d|se|s|en|a|an|to|the)(?=\s|$)/g, ' ')
       .replace(/\s+/g, ' ').trim();
   }
   const frAlts = e => String(e ?? '').replace(/[()]/g, ',').split(/[,;\/]|\bou\b/).map(normFr).filter(Boolean);

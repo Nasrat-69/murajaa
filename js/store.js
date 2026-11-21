@@ -5,7 +5,7 @@ const Store = (() => {
   const MIN = 60000, DAY = 86400000;
   const defaults = () => ({
     v: 1, name: '', updatedAt: 0, center: 'ibaanah',
-    settings: { harakat: 'none', newPerDay: 20, theme: 'auto', osk: false, sound: true, goal: 60 },
+    settings: { harakat: 'none', newPerDay: 20, theme: 'auto', osk: false, sound: true, goal: 60, lang: (navigator.language || 'fr').slice(0, 2) === 'ru' ? 'ru' : (navigator.language || 'fr').slice(0, 2) === 'en' ? 'en' : 'fr' },
     exam: { n: 15, mode: 'qcm', boss: false },
     rev: { mode: 'flip', which: 'due', order: 'random', dir: 'both', n: 20, what: { tr: true, conj: true, pl: true, ant: false, syn: false, prep: false } },
     game: { what: { tr: true, conj: true, pl: true, ant: true, syn: true, prep: true }, dur: 15, choices: 4, n: 10, speed: 'normal' },

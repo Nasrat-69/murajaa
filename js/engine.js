@@ -65,6 +65,9 @@ const Engine = (() => {
           const mine = custom || own;
           if (mine && S().hidden[id]) return;
           const x = Object.assign({}, it, mine ? (S().edits[id] || {}) : {}, { id, lessonId: l.id, deckId: d.id, custom });
+          // langue choisie : sens des mots en anglais / russe s'ils existent
+          const lg = S().settings.lang;
+          if (lg && lg !== 'fr') for (const f of ['fr', 'prep', 'note']) if (x[f + '_' + lg]) x[f] = x[f + '_' + lg];
           arr.push(x); items[id] = x;
         };
         (l.items || []).forEach((it, i) => { if (d.user && !it.id) it.id = `${l.id}:${i}`; add(it, it.id || `${l.id}:${i}`, false, !!d.user); });

@@ -8,15 +8,15 @@ const Importer = (() => {
   const isAr = s => AR_RE.test(s || '');
   const norm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
   const KEYS = {
-    pl: ['pluriel', 'pl', 'جمع', 'الجمع'], ant: ['contraire', 'ant', 'oppose', 'عكس', 'العكس'], syn: ['synonyme', 'syn', 'معنى', 'المعنى'],
-    prep: ['harf', 'prep', 'preposition', 'حرف', 'حرف الجر'], ex: ['phrase', 'ex', 'exemple', 'جملة', 'الجملة', 'الجملة المفيدة'],
-    note: ['note', 'remarque'], fem: ['feminin', 'fem', 'مؤنث'], t: ['type'],
-    fr: ['traduction', 'francais', 'sens', 'fr', 'الترجمة'],
+    pl: ['pluriel', 'pl', 'plural', 'множественное', 'мн', 'جمع', 'الجمع'], ant: ['contraire', 'ant', 'oppose', 'opposite', 'antonym', 'антоним', 'عكس', 'العكس'], syn: ['synonyme', 'syn', 'synonym', 'синоним', 'معنى', 'المعنى'],
+    prep: ['harf', 'prep', 'preposition', 'предлог', 'حرف', 'حرف الجر'], ex: ['phrase', 'ex', 'exemple', 'example', 'sentence', 'пример', 'предложение', 'جملة', 'الجملة', 'الجملة المفيدة'],
+    note: ['note', 'remarque', 'заметка'], fem: ['feminin', 'fem', 'feminine', 'женский', 'مؤنث'], t: ['type', 'тип'],
+    fr: ['traduction', 'francais', 'sens', 'fr', 'translation', 'meaning', 'перевод', 'الترجمة'],
     madi: ['passe', 'madi', 'الماضي', 'ماضي'], mud: ['present', 'mudari', 'المضارع', 'مضارع'], amr: ['imperatif', 'amr', 'الأمر', 'أمر'],
     masdar: ['masdar', 'المصدر', 'مصدر'], w: ['mot', 'الكلمة', 'كلمة']
   };
   const keyOf = k => { k = norm(k).replace(/[\s:]+$/, ''); for (const [f, names] of Object.entries(KEYS)) if (names.map(norm).includes(k)) return f; return null; };
-  const TYPE_WORDS = { verbe: 'verb', verb: 'verb', nom: 'noun', noun: 'noun', adjectif: 'adj', adj: 'adj', expression: 'expr', expr: 'expr' };
+  const TYPE_WORDS = { verbe: 'verb', verb: 'verb', 'глагол': 'verb', nom: 'noun', noun: 'noun', 'существительное': 'noun', adjectif: 'adj', adj: 'adj', adjective: 'adj', 'прилагательное': 'adj', expression: 'expr', expr: 'expr', 'выражение': 'expr' };
   const looksMudari = s => /^[يتنأ][ً-ْ]?/.test(AR.clean(s));
 
   function parseLine(raw) {
@@ -105,10 +105,18 @@ const Importer = (() => {
   }
   const toText = items => items.map(toLine).join('\n');
 
-  const EXAMPLE = `ذَهَبَ / يَذْهَبُ / اِذْهَبْ / ذَهَابًا + إِلَى = aller
-مَطَارٌ (مَطَارَاتٌ) = aéroport
-كَبِيرٌ = grand | contraire: صَغِيرٌ
-طَالِبٌ (طُلَّابٌ) = étudiant | synonyme: تِلْمِيذٌ | phrase: الطَّالِبُ جَدِيدٌ`;
+  const EX = {
+    fr: ['aller', 'aéroport', 'grand | contraire', 'étudiant | synonyme', 'phrase'],
+    en: ['to go', 'airport', 'big | opposite', 'student | synonym', 'sentence'],
+    ru: ['идти', 'аэропорт', 'большой | антоним', 'студент | синоним', 'пример']
+  };
+  const example = () => {
+    const w = EX[(window.I18N && I18N.lang) || 'fr'] || EX.fr;
+    return `ذَهَبَ / يَذْهَبُ / اِذْهَبْ / ذَهَابًا + إِلَى = ${w[0]}
+مَطَارٌ (مَطَارَاتٌ) = ${w[1]}
+كَبِيرٌ = ${w[2]}: صَغِيرٌ
+طَالِبٌ (طُلَّابٌ) = ${w[3]}: تِلْمِيذٌ | ${w[4]}: الطَّالِبُ جَدِيدٌ`;
+  };
 
-  return { parse, parseLine, toText, toLine, EXAMPLE };
+  return { parse, parseLine, toText, toLine, get EXAMPLE() { return example(); } };
 })();

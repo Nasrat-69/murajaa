@@ -16,7 +16,7 @@
   /* ---------- utilitaires ---------- */
   function toast(msg, ms = 2600) {
     const t = document.getElementById('toast');
-    t.textContent = msg; t.classList.add('show');
+    t.textContent = I18N.t(msg); t.classList.add('show');
     clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms);
   }
   function later(fn, ms) { const id = setTimeout(fn, ms); timeouts.push(id); return id; }
@@ -46,6 +46,7 @@
     catch (e) { prompt('Copie ce texte :', text); }
   }
   const fmtTime = ms => { const s = Math.round(ms / 1000); return s >= 60 ? `${Math.floor(s / 60)} min ${s % 60} s` : `${s} s`; };
+  const isDark = () => (S().settings.theme === 'dark') || (S().settings.theme === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches);
   function applyTheme() { const t = S().settings.theme; if (t === 'auto') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t); }
   const todayXP = () => (S().days[Store.today()] || { xp: 0 }).xp;
   function gain(n, label = true) { if (n <= 0) return; Store.addXP(n); if (label) FX.floatCenter('+' + n + ' XP', 'xp'); }
@@ -90,6 +91,7 @@
     const session = SESSION.includes(V.name);
     const enter = V.name !== lastView; lastView = V.name;
     app.innerHTML = (session ? '' : header()) + `<main class="main ${session ? 'session' : ''} ${enter ? 'enter' : ''}">${html}</main>` + (session ? '' : nav()) + (inappHelp ? inappModal() : '');
+    I18N.apply(app);
     if (!enter) app.querySelectorAll('.hole-in:not([readonly])').forEach(i => { if (drafts[i.dataset.f] != null && !i.value) i.value = drafts[i.dataset.f]; if (focusF === i.dataset.f) i.focus({ preventScroll: true }); });
     const af = app.querySelector('[autofocus]'); if (af && !focusF && !matchMedia('(pointer:coarse)').matches) af.focus({ preventScroll: true });
     OSK.refresh();
@@ -104,6 +106,8 @@
       <div class="hud">
         <span class="pill" data-tip="Jours de suite">${ico('flame', 'fire')}${Store.streak()}</span>
         <span class="pill" data-tip="${S().xp} XP · encore ${L.next} XP pour le niveau ${L.lvl + 1}">${ico('star', 'gold')}${L.lvl}</span>
+        <div class="langw"><button class="pill langb" data-a="langMenu" aria-label="Langue">${ico('globe')}${I18N.LANGS[I18N.lang].short}</button>${V.langOpen ? `<div class="langm">${Object.entries(I18N.LANGS).map(([k, l]) => `<button class="noi18n ${k === I18N.lang ? 'on' : ''}" data-a="setLang" data-v="${k}">${l.name}</button>`).join('')}</div>` : ''}</div>
+        <button class="icon themeb" data-a="toggleTheme" aria-label="Mode sombre">${ico(isDark() ? 'sun' : 'moon')}</button>
         <button class="avbtn" data-a="go" data-to="account" aria-label="Mon compte">${u ? avatar({ name: S().name || u.displayName, photo: u.photoURL }) : `<span class="av ghost">${ico('user')}</span>`}</button>
       </div></div></header>`;
   }
@@ -354,12 +358,12 @@
   const SEC_ICON = { tr: 'globe', conj: 'repeat', pl: 'plural', antsyn: 'swap', prep: 'link', sent: 'book' };
   const SEC_CATS = { tr: { tr: true }, conj: { conj: true }, pl: { pl: true }, antsyn: { ant: true, syn: true }, prep: { prep: true }, sent: { tr: true } };
   const lvlName = () => ({ none: 'souple (lettres seulement)', mudari: 'voyelle du muḍāriʿ exigée', strict: 'toutes les harakat' }[S().settings.harakat]);
-  const fmtNote = n => (Math.round(n * 2) / 2).toLocaleString('fr-FR');
+  const fmtNote = n => (Math.round(n * 2) / 2).toLocaleString(I18N.loc());
   const mention = n => (n >= 16 ? 'Excellent' : n >= 14 ? 'Très bien' : n >= 12 ? 'Bien' : n >= 10 ? 'Assez bien' : 'À retravailler');
   function examHistory(list) {
     if (!list.length) return '';
-    return `<div class="hist">${list.map(e => `<div class="hrow" data-tip="${new Date(e.at).toLocaleDateString('fr-FR')} : ${fmtNote(e.note)}/20">
-      <span class="muted small">${new Date(e.at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+    return `<div class="hist">${list.map(e => `<div class="hrow" data-tip="${new Date(e.at).toLocaleDateString(I18N.loc())} : ${fmtNote(e.note)}/20">
+      <span class="muted small">${new Date(e.at).toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'short' })}</span>
       <span class="bar"><b style="width:${e.note / 20 * 100}%"></b></span><b>${fmtNote(e.note)}/20</b></div>`).join('')}</div>`;
   }
   VIEWS.examSetup = () => {
@@ -1047,7 +1051,7 @@
         <tr><td>Temps</td><td>${fmtTime(m.t)}</td><td>${fmtTime(t.t)}</td></tr>
         <tr><td>Questions</td><td class="bits">${m.b.split('').map(x => `<i class="${x === '1' ? 'y' : 'n'}"></i>`).join('')}</td><td class="bits">${t.b.split('').map(x => `<i class="${x === '1' ? 'y' : 'n'}"></i>`).join('')}</td></tr></table>`;
     }
-    return `<section class="panel duelcard"><div class="row between"><b>Défi de ${esc(dl.by || '?')}</b><small class="muted">${new Date(dl.at).toLocaleDateString('fr-FR')} · ${dl.n} questions</small></div>
+    return `<section class="panel duelcard"><div class="row between"><b>Défi de ${esc(dl.by || '?')}</b><small class="muted">${new Date(dl.at).toLocaleDateString(I18N.loc())} · ${dl.n} questions</small></div>
       ${verdict || (m ? `<p>Ton score : <b>${m.sc}/${m.mx}</b> en ${fmtTime(m.t)}</p>` : '<p class="muted">Pas encore joué.</p>')}
       ${m && !t ? `<p class="muted small">Envoie ton code résultat, puis colle celui de ton binôme :</p>
         <div class="row"><button class="btn sm" data-a="copy" data-text="${esc(dl.myCode)}">${ico('copy')}Mon code résultat</button></div>
@@ -1080,7 +1084,7 @@
     for (let i = 0; i < n; i++) { out.push(Store.today(d)); d.setDate(d.getDate() + 1); }
     return out;
   }
-  const dfmt = k => new Date(k + 'T12:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const dfmt = k => new Date(k + 'T12:00:00').toLocaleDateString(I18N.loc(), { day: 'numeric', month: 'short' });
   function barChart(keys, vals, unit) {
     const W = 640, H = 190, padL = 30, padB = 22, padT = 12, n = keys.length;
     const max = Math.max(10, ...vals), nice = Math.ceil(max / 10) * 10;
@@ -1149,7 +1153,7 @@
     else if (!u) acc = `<section class="panel empty">${ico('user', 'big')}<h3>Crée ton compte</h3><p class="muted">Avec ton compte Google : ta progression est sauvegardée et synchronisée sur ton téléphone et ton PC, et tu peux jouer en direct avec ton binôme.</p>
       ${inappNotice()}<button class="btn google lg" data-a="signIn">${GOOGLE_G}Continuer avec Google</button>${c.error ? `<p class="warn">${esc(c.error)}</p>` : ''}</section>`;
     else acc = `<section class="panel profile">${avatar({ name: S().name || u.displayName, photo: u.photoURL }, 'lg')}<div><h2>${esc(S().name || u.displayName || '')}</h2><p class="muted small">${esc(u.email || '')}</p>
-        <p class="sync ${c.status}">${ico(c.status === 'error' ? 'x' : 'cloud')}${status}${c.lastSync ? ` · ${new Date(c.lastSync).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}</p></div>
+        <p class="sync ${c.status}">${ico(c.status === 'error' ? 'x' : 'cloud')}${status}${c.lastSync ? ` · ${new Date(c.lastSync).toLocaleTimeString(I18N.loc(), { hour: '2-digit', minute: '2-digit' })}` : ''}</p></div>
         <div class="row wrap"><button class="btn sm" data-a="syncNow">${ico('repeat')}Synchroniser</button><button class="btn sm ghost" data-a="signOut">${ico('logout')}Se déconnecter</button></div></section>`;
     return `<div class="page-h"><h1>Mon compte</h1></div>${acc}
       <section class="panel"><h2>Mon centre</h2><p class="muted small">Le centre dont tu révises le vocabulaire.</p>${centerSwitch()}</section>
@@ -1309,7 +1313,10 @@
         <label class="fld">Nouvelles cartes par jour (répétition espacée)<input type="number" min="0" max="200" value="${st.newPerDay}" data-a="setNum" data-k="newPerDay"></label>
         <label class="fld">Objectif quotidien (XP)<input type="number" min="10" max="1000" value="${st.goal}" data-a="setNum" data-k="goal"></label></section>
       <section class="panel"><h3>Affichage et sons</h3>
-        ${radio('theme', 'auto', 'Automatique')}${radio('theme', 'light', 'Clair')}${radio('theme', 'dark', 'Sombre')}
+        ${radio('theme', 'auto', 'Automatique')}${radio('theme', 'light', 'Clair')}${radio('theme', 'dark', 'Sombre')}</section>
+      <section class="panel"><h3>Langue</h3><div class="pchips">${Object.entries(I18N.LANGS).map(([k, l]) => `<button class="pchip noi18n ${k === I18N.lang ? 'on' : ''}" data-a="setLang" data-v="${k}">${l.name}</button>`).join('')}</div>
+        <p class="muted small">Change toute l'interface et le sens des mots du livre.</p></section>
+      <section class="panel"><h3>Sons et clavier</h3>
         ${tog('sound', 'Effets sonores')}${tog('osk', 'Clavier arabe à l\'écran (remplace celui du téléphone)')}</section>
       <section class="panel"><h3>Sauvegarde</h3><p class="muted small">${Cloud.st.user ? 'Ta progression est synchronisée avec ton compte.' : 'Ta progression est enregistrée sur cet appareil. Connecte-toi pour la synchroniser, ou exporte-la.'}</p>
         <div class="row wrap"><button class="btn sm" data-a="exportAll">${ico('upload')}Exporter</button>
@@ -1342,6 +1349,9 @@
     },
     quickMode: b => { S().rev.mode = b.dataset.v; Store.save(); go('reviewSetup'); },
     goImport: () => go('import'),
+    langMenu: () => { V.langOpen = !V.langOpen; render(); },
+    setLang: b => { V.langOpen = false; if (b.dataset.v === S().settings.lang) { render(); return; } S().settings.lang = b.dataset.v; Store.save(); Store.saveNow(); location.reload(); },
+    toggleTheme: () => { S().settings.theme = isDark() ? 'light' : 'dark'; Store.save(); applyTheme(); render(); },
     reviseDeck: b => { const d = LIB.decks.find(x => x.id === b.dataset.id); S().sel = d.lessons.map(l => l.id); Store.save(); go('reviewSetup'); },
     revOpt: b => { S().rev[b.dataset.k] = parseV(b.dataset.v); Store.save(); FX.sound.tap(); render(); },
     revWhat: b => { const w = S().rev.what; w[b.dataset.k] = !w[b.dataset.k]; Store.save(); FX.sound.tap(); render(); },
@@ -1558,6 +1568,7 @@
   };
 
   app.addEventListener('click', e => {
+    if (V.langOpen && !e.target.closest('.langw')) { V.langOpen = false; render(); }
     const b = e.target.closest('[data-a]'); if (!b) return;
     if (b.tagName === 'INPUT' && (b.type === 'file' || b.type === 'number' || b.type === 'checkbox')) return;
     if (b.classList.contains('modal') && e.target.closest('[data-stop]')) return;
@@ -1653,6 +1664,9 @@
   })();
 
   /* ---------- démarrage ---------- */
+  I18N.set(S().settings.lang); rebuild();
+  I18N.apply(document.getElementById('osk'));
+  document.title = I18N.t('Murājaʿa');
   applyTheme();
   Cloud.on(st => {
     if (st.status === 'ok' || st.status === 'out') { rebuild(); applyTheme(); }

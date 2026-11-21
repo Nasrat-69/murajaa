@@ -220,6 +220,7 @@ const Call = (() => {
          <button class="cbtn ${st.cam ? 'on' : ''}" data-c="cam" aria-label="Caméra">${ico(st.cam ? 'video' : 'camoff')}</button>
          <button class="cbtn red" data-c="leave" aria-label="Quitter l'appel">${ico('phone')}</button>`
       : `<button class="cbtn join" data-c="join" ${st.joining ? 'disabled' : ''}>${ico('headset')}${st.joining ? 'Connexion…' : 'Rejoindre le salon vocal'}</button>`;
+    if (window.I18N) I18N.apply(el);
     bindMedia();
   }
 
