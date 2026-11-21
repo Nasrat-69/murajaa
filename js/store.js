@@ -10,7 +10,7 @@ const Store = (() => {
     rev: { mode: 'flip', which: 'due', order: 'random', dir: 'both', n: 20, what: { tr: true, conj: true, pl: true, ant: false, syn: false, prep: false } },
     game: { what: { tr: true, conj: true, pl: true, ant: true, syn: true, prep: true }, dur: 15, choices: 4, n: 10, speed: 'normal' },
     live: { n: 10, mode: 'qcm', time: 30, adv: 'auto' },
-    paper: { sections: ['tr', 'conj', 'pl', 'antsyn', 'prep', 'sent'], size: 8, mode: 'type', timer: 0 },
+    paper: { sections: ['tr', 'conj', 'pl', 'antsyn', 'prep', 'sent'], size: 8, mode: 'type', timer: 0, order: 'random' },
     exams: [],
     sel: [], cards: {}, items: {}, edits: {}, hidden: {}, custom: {}, decks: [],
     xp: 0, days: {}, best: { rush: 0, tf: 0, rain: 0, anagram: 0 }, newLog: {}, duels: [],

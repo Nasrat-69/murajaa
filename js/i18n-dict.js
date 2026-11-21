@@ -1,6 +1,7 @@
 /* Traductions de l'interface : [français, anglais, russe]. {n} = un nombre. */
 (() => {
   const T = [
+    ["Ordre des mots", "Word order", "Порядок слов"], ["Ordre des questions", "Question order", "Порядок вопросов"],
     ["Plusieurs prépositions", "Several prepositions", "Несколько предлогов"],
     ["Règles : l'arabe d'abord, puis le signe = et la traduction. Les formes d'un verbe sont séparées par /. Le pluriel va entre ( ). Les infos en plus se mettent après |. Tu peux aussi coller des colonnes depuis Excel ou Google Sheets.",
      "Rules: Arabic first, then the = sign and the translation. A verb's forms are separated by /. The plural goes between ( ). Extra info goes after |. You can also paste columns from Excel or Google Sheets.",

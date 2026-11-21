@@ -252,8 +252,8 @@
         <p class="muted small">Pour le pluriel, les contraires et les synonymes : « Arabe → Français » va du mot vers sa forme, l'autre sens fait l'inverse.</p></section>
       <section class="panel"><h2 class="step"><i>3</i>Quelles cartes ?</h2>
         <div class="which">${WHICH.map(([k, t, d]) => `<button class="wh ${r.which === k ? 'on' : ''} ${cnt[k] ? '' : 'empty'}" data-a="revOpt" data-k="which" data-v="${k}"><b>${t}</b><span class="whn">${cnt[k]}</span><small>${d}</small></button>`).join('')}</div>
-        ${r.which !== 'due' ? `<h3>Ordre</h3>${seg('revOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], r.order)}
-          <h3>Nombre de cartes</h3>${seg('revOpt', 'n', [[10, '10'], [20, '20'], [40, '40'], ['all', 'Toutes']], r.n)}` : ''}</section>
+        <h3>Ordre des mots</h3>${seg('revOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], r.order)}
+        ${r.which !== 'due' ? `<h3>Nombre de cartes</h3>${seg('revOpt', 'n', [[10, '10'], [20, '20'], [40, '40'], ['all', 'Toutes']], r.n)}` : ''}</section>
       <section class="panel"><h2 class="step"><i>4</i>Comment ?</h2>
         <div class="modes">${MODES.map(([k, i, t, d]) => `<button class="mode ${r.mode === k ? 'on' : ''}" data-a="revOpt" data-k="mode" data-v="${k}"><span class="mi">${ico(i)}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div></section>
       <div class="cta-bar"><div class="cta-info"><b>${n}</b> carte${n > 1 ? 's' : ''}<small>${esc(WHICH.find(w => w[0] === r.which)[1])} · ${cards.length} au total</small></div>
@@ -396,6 +396,7 @@
         <h3>Longueur</h3>${seg('paperOpt', 'size', [[4, 'Courte'], [8, 'Normale'], [15, 'Longue'], ['all', 'Complète']], p.size)}
         <p class="muted small">Courte : 4 questions par partie · Normale : 8 · Longue : 15 · Complète : tous les mots.</p>
         <h3>Réponses</h3>${seg('paperOpt', 'mode', [['type', 'À écrire'], ['qcm', 'Choix multiples']], p.mode)}
+        <h3>Ordre des questions</h3>${seg('paperOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], p.order || 'random')}
         <h3>Temps limite</h3>${seg('paperOpt', 'timer', [[0, 'Sans'], [10, '10 min'], [20, '20 min'], [30, '30 min'], [45, '45 min']], p.timer)}
         ${p.mode === 'type' ? `<p class="muted small">Correction des harakat : <b>${lvlName()}</b> — <button class="link" data-a="go" data-to="settings">modifier</button></p>` : ''}</section>
       ${hist.length ? `<section class="panel"><h2>${ico('chart')} Tes derniers examens</h2>${examHistory(hist)}</section>` : ''}
@@ -404,7 +405,7 @@
   };
   function startPaper(items, opts = {}) {
     const p = S().paper;
-    const secs = Engine.makePaper(items || Engine.itemsFor(sel()), { sections: opts.sections || p.sections, size: opts.size || p.size });
+    const secs = Engine.makePaper(items || Engine.itemsFor(sel()), { sections: opts.sections || p.sections, size: opts.size || p.size, order: p.order || 'random' });
     if (!secs.length) { toast('Pas assez de mots pour ces parties.'); return; }
     const answered = () => Object.keys(V.ans).filter(q => Object.values(V.ans[q]).some(v => v)).length;
     go('paper', { secs, si: 0, ans: {}, answered, mode: opts.mode || p.mode, level: S().settings.harakat, t0: Date.now(), limit: (opts.timer ?? p.timer) * 60000, done: false });

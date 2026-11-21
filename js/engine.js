@@ -162,14 +162,15 @@ const Engine = (() => {
     const ks = Object.keys(KINDS).filter(k => KINDS[k].cat === cat);
     return items.filter(it => ks.some(k => spec(k, it))).length;
   }
-  function srsQueue(list) {
+  function srsQueue(list, random = (S().rev || {}).order !== 'book') {
     const now = Date.now(), due = [], fresh = [];
     for (const c of list) {
       const st = S().cards[c.id];
       if (st) { if (st.due <= now) due.push(Object.assign({ due: st.due }, c)); }
       else fresh.push(c);
     }
-    due.sort((a, b) => a.due - b.due);
+    // aléatoire : les nouveaux mots sont tirés au hasard dans toute la sélection (pas toujours les premiers du livre)
+    if (random) { shuffle(due); shuffle(fresh); } else due.sort((a, b) => a.due - b.due);
     const limit = Math.max(0, S().settings.newPerDay - Store.newToday());
     const rank = k => (/_r$|frar/.test(k) ? 2 : k === 'arfr' ? 0 : 1);
     const nw = fresh.slice(0, limit).map((c, i) => ({ c, i })).sort((a, b) => rank(a.c.kind) - rank(b.c.kind) || a.i - b.i).map(x => x.c);
@@ -314,11 +315,17 @@ const Engine = (() => {
     const p = sectionPool(key, items);
     return new Set(p.map(x => x.it.vid || x.it.id)).size;
   }
-  function makePaper(items, { sections, size = 8, rng = Math.random }) {
+  function makePaper(items, { sections, size = 8, rng = Math.random, order = 'random' }) {
     const out = [];
     let qid = 0;
     for (const key of sections) {
-      let pool = shuffle(sectionPool(key, items), rng);
+      let pool = sectionPool(key, items);
+      if (order === 'book') {
+        // ordre du livre : on parcourt les mots dans l'ordre, en alternant le sens des questions
+        const firsts = [], seconds = [], seenB = new Set();
+        pool.forEach(x => { const k = x.it.vid || x.it.id; (seenB.has(k) ? seconds : firsts).push(x); seenB.add(k); });
+        pool = firsts.map((x, i) => (i % 2 && seconds.find(y => (y.it.vid || y.it.id) === (x.it.vid || x.it.id))) || x);
+      } else pool = shuffle(pool, rng);
       // un mot ne revient pas deux fois dans la même partie
       const seen = new Set(); pool = pool.filter(x => { const k = x.it.vid || x.it.id; if (seen.has(k)) return false; seen.add(k); return true; });
       const n = size === 'all' ? Math.min(pool.length, 25) : Math.min(pool.length, size);
