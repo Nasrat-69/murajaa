@@ -60,17 +60,20 @@ const Engine = (() => {
       id: d.id, title: d.title, subtitle: d.subtitle, user: !!d.user, center: d.center || 'ibaanah',
       lessons: (d.lessons || []).map(l => {
         const arr = [];
-        // la base du livre est fixe : seules les données perso peuvent être modifiées ou supprimées
-        const add = (it, id, custom, own) => {
-          const mine = custom || own;
-          if (mine && S().hidden[id]) return;
-          const x = Object.assign({}, it, mine ? (S().edits[id] || {}) : {}, { id, lessonId: l.id, deckId: d.id, custom });
+        // 1) base commune : corrections de l'admin pour tout le monde ; 2) changements perso de ce compte
+        const G = (typeof Cloud !== 'undefined' && Cloud.base) || { edits: {}, hidden: {}, added: {} };
+        const add = (it, id, custom, own, global) => {
+          const isBase = !custom && !own;
+          if (isBase && G.hidden[id]) return;
+          if (S().hidden[id]) return;
+          const x = Object.assign({}, it, isBase ? (G.edits[id] || {}) : {}, S().edits[id] || {}, { id, lessonId: l.id, deckId: d.id, custom, global: !!global });
           // langue choisie : sens des mots en anglais / russe s'ils existent
           const lg = S().settings.lang;
           if (lg && lg !== 'fr') for (const f of ['fr', 'prep', 'note']) if (x[f + '_' + lg]) x[f] = x[f + '_' + lg];
           arr.push(x); items[id] = x;
         };
         (l.items || []).forEach((it, i) => { if (d.user && !it.id) it.id = `${l.id}:${i}`; add(it, it.id || `${l.id}:${i}`, false, !!d.user); });
+        if (!d.user) (G.added[l.id] || []).forEach(it => { if (!G.hidden[it.id]) add(it, it.id, false, false, true); });
         (S().custom[l.id] || []).forEach(it => add(it, it.id, true));
         const L = { id: l.id, title: l.title, titleAr: l.titleAr, deckId: d.id, items: arr };
         lessons[l.id] = L;

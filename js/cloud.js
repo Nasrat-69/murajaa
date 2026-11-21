@@ -5,6 +5,16 @@ const Cloud = (() => {
   const subs = new Set();
   let auth = null, db = null, pushT = null, pulling = false;
   const emit = () => subs.forEach(f => { try { f(st); } catch (e) { console.warn(e); } });
+  /* ---- base commune : corrections / ajouts / suppressions faits par l'admin pour tout le monde ---- */
+  let base = { edits: {}, hidden: {}, added: {} };
+  function setBase(b) { base = { edits: (b && b.edits) || {}, hidden: (b && b.hidden) || {}, added: (b && b.added) || {} }; }
+  try { setBase(JSON.parse(localStorage.getItem('murajaa.base') || '{}')); } catch (e) { /* rien */ }
+  const isAdmin = () => !!(st.user && (window.ADMIN_UIDS || []).includes(st.user.uid));
+  async function saveBase(mutate) {
+    if (!isAdmin()) throw new Error('Réservé à l\'administrateur');
+    const b = JSON.parse(JSON.stringify(base)); mutate(b); setBase(b);
+    await db.doc('base/main').set({ json: JSON.stringify(base), at: Date.now(), by: st.user.uid });
+  }
   const uid = () => (st.user ? st.user.uid : null);
   const FV = () => firebase.firestore.FieldValue;
 
@@ -21,6 +31,12 @@ const Cloud = (() => {
         else { st.status = 'out'; emit(); }
       });
       Store.onSave = schedulePush;
+      // base commune (modifiée par l'admin) : lisible par tous, même sans compte
+      db.doc('base/main').onSnapshot(s => {
+        const b = s.exists ? JSON.parse(s.data().json || '{}') : {};
+        setBase(b); try { localStorage.setItem('murajaa.base', JSON.stringify(b)); } catch (e) { /* plein */ }
+        emit();
+      }, e => console.warn('base', e));
       window.addEventListener('online', () => { if (st.user) schedulePush(); });
     } catch (e) { console.warn(e); st.status = 'error'; st.error = e.message; }
   }
@@ -162,7 +178,7 @@ const Cloud = (() => {
   return {
     st, init, signIn, signOut, pull, pushNow, profiles, uid,
     createRoom, joinRoom, watchRoom, updateSettings, startRoom, advance, answer, leaveRoom, rematch,
-    advanceFrom, pause, resume, setCall, rtc, arrayUnion, share, getShared,
+    advanceFrom, pause, resume, setCall, rtc, arrayUnion, share, getShared, isAdmin, saveBase, get base() { return base; },
     on: f => { subs.add(f); return () => subs.delete(f); }
   };
 })();

@@ -509,6 +509,16 @@ details { border-bottom: 1px solid var(--line); padding: 6px 0; } summary { curs
 .tf-side .flabel, .given > .flabel, .drop .flabel, .pgiven .flabel { margin-bottom: 4px; position: relative; z-index: 1; }
 .ar.xxl, .ar.xl { display: inline-block; padding-top: .15em; }
 
+/* ===== Mots : mode admin, étiquettes ===== */
+.adminbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; padding: 10px 14px; margin: 12px 0; }
+.adminbar > div { display: flex; flex-direction: column; } .adminbar small { color: var(--muted); }
+.adminbar.on { border-color: var(--bad); background: var(--bad-soft); } .adminbar.on b { color: var(--bad); }
+.adminbar .toggle { padding: 0; }
+.wtag { font-size: .66rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; border-radius: 6px; padding: 1px 6px; background: var(--primary-soft); color: var(--primary); margin-inline-start: 4px; }
+.wtag.g { background: var(--good-soft); color: var(--good); }
+.scope { font-size: .86rem; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 6px 10px; }
+.scope.admin { color: var(--bad); background: var(--bad-soft); font-weight: 700; }
+
 /* ===== Question posée, bien visible ===== */
 .qask { display: flex; align-items: baseline; justify-content: center; gap: 10px; flex-wrap: wrap; text-align: center; margin: 4px 0 6px; }
 .qask b { font-size: 1.15rem; font-weight: 800; color: var(--primary); }
@@ -541,12 +551,12 @@ details { border-bottom: 1px solid var(--line); padding: 6px 0; } summary { curs
 
 /* ===== Réviser : choix des cartes ===== */
 .which { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-.wh { position: relative; text-align: start; border: 1.5px solid var(--line); background: var(--surface); border-radius: 14px; padding: 12px 54px 12px 14px; display: flex; flex-direction: column; gap: 2px; transition: border-color .15s, background .15s; }
-.wh:hover { border-color: var(--primary); }
-.wh small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
+.whc { position: relative; text-align: start; border: 1.5px solid var(--line); background: var(--surface); border-radius: 14px; padding: 12px 54px 12px 14px; display: flex; flex-direction: column; gap: 2px; transition: border-color .15s, background .15s; }
+.whc:hover { border-color: var(--primary); }
+.whc small { color: var(--muted); font-size: .78rem; line-height: 1.35; }
 .whn { position: absolute; top: 10px; right: 12px; font-weight: 800; font-size: .9rem; color: var(--muted); background: var(--surface-2); border-radius: 999px; padding: 1px 9px; }
-.wh.on { border-color: var(--primary); background: var(--primary-soft); } .wh.on .whn { background: var(--primary); color: #fff; }
-.wh.empty { opacity: .5; }
+.whc.on { border-color: var(--primary); background: var(--primary-soft); } .whc.on .whn { background: var(--primary); color: #fff; }
+.whc.empty { opacity: .5; }
 
 /* ===== Examen blanc ===== */
 .ptabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; scrollbar-width: none; }

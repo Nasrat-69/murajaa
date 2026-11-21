@@ -31,6 +31,12 @@ service cloud.firestore {
       }
     }
 
+    // base commune des mots : lue par tous, modifiée seulement par l'administrateur
+    match /base/{doc} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == 'bBtK4IMl53alF793FbWhOFt2b553';
+    }
+
     // paquets de mots partagés par code
     match /shared/{code} {
       allow read: if request.auth != null;

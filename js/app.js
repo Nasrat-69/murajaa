@@ -254,7 +254,7 @@
         <h3>Sens</h3>${seg('revOpt', 'dir', [['ar', 'Arabe → Français'], ['fr', 'Français → Arabe'], ['both', 'Les deux']], r.dir)}
         <p class="muted small">Pour le pluriel, les contraires et les synonymes : « Arabe → Français » va du mot vers sa forme, l'autre sens fait l'inverse.</p></section>
       <section class="panel"><h2 class="step"><i>3</i>Quelles cartes ?</h2>
-        <div class="which">${WHICH.map(([k, t, d]) => `<button class="wh ${r.which === k ? 'on' : ''} ${cnt[k] ? '' : 'empty'}" data-a="revOpt" data-k="which" data-v="${k}"><b>${t}</b><span class="whn">${cnt[k]}</span><small>${d}</small></button>`).join('')}</div>
+        <div class="which">${WHICH.map(([k, t, d]) => `<button class="whc ${r.which === k ? 'on' : ''} ${cnt[k] ? '' : 'empty'}" data-a="revOpt" data-k="which" data-v="${k}"><b>${t}</b><span class="whn">${cnt[k]}</span><small>${d}</small></button>`).join('')}</div>
         <h3>Ordre des mots</h3>${seg('revOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], r.order)}
         ${r.which !== 'due' ? `<h3>Nombre de cartes</h3>${seg('revOpt', 'n', [[10, '10'], [20, '20'], [40, '40'], ['all', 'Toutes']], r.n)}` : ''}</section>
       <section class="panel"><h2 class="step"><i>4</i>Comment ?</h2>
@@ -1182,71 +1182,88 @@
       </div>`;
   };
 
-  /* ----- Mots : base officielle (verrouillée) + mes paquets (modifiables) ----- */
+  /* ----- Mots : chaque compte ajoute / modifie / supprime pour lui-même ; l'admin peut changer la base pour tous ----- */
   const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   const deckOf = L => LIB.decks.find(d => d.id === L.deckId);
   const userDeck = id => S().decks.find(d => d.id === id);
+  const adminOn = () => Cloud.isAdmin() && !!S().adminMode;
+  // mots du livre masqués par ce compte, dans une leçon
+  const hiddenIn = L => {
+    const raw = (window.DECKS || []).flatMap(d => d.lessons).find(l => l.id === L.id);
+    const ids = raw ? raw.items.map((it, i) => it.id || `${L.id}:${i}`) : [];
+    return ids.concat((Cloud.base.added[L.id] || []).map(it => it.id)).filter(id => S().hidden[id]);
+  };
   VIEWS.words = () => {
     if (V.lesson && LIB.lessons[V.lesson]) return lessonView();
     const decks = centerDecks(), base = decks.filter(d => !d.user), mine = decks.filter(d => d.user);
     const lrow = l => `<button class="lrow" data-a="openLesson" data-id="${esc(l.id)}"><span class="lt">${esc(l.title)} ${ar(l.titleAr || '', 'sm')}</span><span class="cnt">${l.items.length} mots</span>${bar(Engine.lessonMastery(l))}${ico('chevron', 'chev')}</button>`;
-    return `<div class="page-h"><h1>Mots</h1><p class="muted">La base du livre est fixe. Tes propres paquets, eux, se modifient librement — et seulement pour toi.</p></div>${centerSwitch()}
+    return `<div class="page-h"><h1>Mots</h1><p class="muted">Ajoute, corrige ou supprime les mots comme tu veux : ça ne change que ton compte, jamais celui des autres.</p></div>${centerSwitch()}
+      ${adminBar()}
       <button class="addbig" data-a="goImport">${ico('plus')}<div><b>Ajouter des mots</b><small>Colle ta liste, une ligne par mot. Ou importe le paquet d'un ami avec son code.</small></div>${ico('chevron')}</button>
-      ${base.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')}</small></div><span class="lock">${ico('check')}Base officielle</span></div>${d.lessons.map(lrow).join('')}</section>`).join('')}
+      ${base.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')}</small></div><span class="lock">${ico('book')}Livre</span></div>${d.lessons.map(lrow).join('')}</section>`).join('')}
       <h2 class="sec">Mes paquets</h2>
       ${mine.length ? mine.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t"><b class="dname">${esc(d.title)}</b><small>${d.lessons.length} texte${d.lessons.length > 1 ? 's' : ''}</small></div>
           <div class="row"><button class="btn sm ghost" data-a="renameDeck" data-id="${esc(d.id)}">Renommer</button><button class="btn sm ghost danger-t" data-a="delDeck" data-id="${esc(d.id)}">Supprimer</button></div></div>
         ${d.lessons.map(lrow).join('') || '<p class="muted small">Aucun texte.</p>'}</section>`).join('')
-        : `<section class="panel empty">${ico('book', 'big')}<h3>Aucun paquet perso</h3><p class="muted">Ajoute tes propres mots : ils s'ajoutent à la base, sans la modifier.</p></section>`}
+        : `<section class="panel empty">${ico('book', 'big')}<h3>Aucun paquet perso</h3><p class="muted">Crée tes propres paquets de mots, en plus de ceux du livre.</p></section>`}
       ${!decks.length ? emptyCenter() : ''}`;
   };
+  function adminBar() {
+    if (!Cloud.isAdmin()) return '';
+    return `<div class="adminbar ${S().adminMode ? 'on' : ''}"><div><b>${ico('crown')} Mode administrateur</b><small>${S().adminMode ? 'Tes ajouts, corrections et suppressions dans les mots du livre s\'appliquent à TOUS les utilisateurs.' : 'Désactivé : tes changements ne concernent que ton compte.'}</small></div>
+      <label class="toggle"><input type="checkbox" data-a="setAdmin" ${S().adminMode ? 'checked' : ''}><i></i></label></div>`;
+  }
   function lessonView() {
     const L = LIB.lessons[V.lesson], d = deckOf(L), own = d && d.user;
     const selOn = !!V.selMode, picked = V.picked || (V.picked = {});
     const rows = L.items.map(it => {
       const forms = it.t === 'verb' ? [it.mud, it.amr, it.masdar] : [it.pl];
-      const editable = own || it.custom;
-      return `<button class="wrow ${selOn && editable ? 'sel' : ''} ${picked[it.id] ? 'picked' : ''}" data-a="${selOn && editable ? 'pickItem' : 'editItem'}" data-id="${esc(it.id)}">
-        ${selOn && editable ? `<span class="cbx">${picked[it.id] ? ico('check') : ''}</span>` : `<span class="dot" style="--m:${Engine.mastery(it)}"></span>`}
-        <span class="wh">${ar(Engine.head(it), 'md')}</span><span class="wf">${ar(forms.filter(Boolean).join(' · '), 'sm')}</span><span class="wt">${esc(it.fr)}</span></button>`;
+      const tag = it.custom ? '<span class="wtag">perso</span>' : (it.global ? '<span class="wtag g">ajout</span>' : (S().edits[it.id] ? '<span class="wtag">modifié</span>' : ''));
+      return `<button class="wrow ${selOn ? 'sel' : ''} ${picked[it.id] ? 'picked' : ''}" data-a="${selOn ? 'pickItem' : 'editItem'}" data-id="${esc(it.id)}">
+        ${selOn ? `<span class="cbx">${picked[it.id] ? ico('check') : ''}</span>` : `<span class="dot" style="--m:${Engine.mastery(it)}"></span>`}
+        <span class="wh">${ar(Engine.head(it), 'md')}</span><span class="wf">${ar(forms.filter(Boolean).join(' · '), 'sm')}</span><span class="wt">${esc(it.fr)} ${tag}</span></button>`;
     }).join('');
-    const nPicked = Object.values(picked).filter(Boolean).length;
+    const nPicked = Object.values(picked).filter(Boolean).length, hid = own ? [] : hiddenIn(L);
     return `<button class="link back" data-a="go" data-to="words">${ico('back')}Mots</button>
-      <div class="page-h"><h1>${esc(L.title)} ${ar(L.titleAr || '', 'md')}</h1><p class="muted small">${own ? `Mon paquet « ${esc(d.title)} »` : `${ico('check')} Base officielle : non modifiable`} · ${L.items.length} mots</p></div>
+      <div class="page-h"><h1>${esc(L.title)} ${ar(L.titleAr || '', 'md')}</h1><p class="muted small">${own ? `Mon paquet « ${esc(d.title)} »` : 'Livre'} · ${L.items.length} mots</p></div>
+      ${!own ? adminBar() : ''}
       <div class="row wrap"><button class="btn primary" data-a="lessonReview" data-id="${esc(L.id)}">${ico('cards')}Réviser ce texte</button><button class="btn" data-a="lessonExam" data-id="${esc(L.id)}">${ico('exam')}Examen blanc</button>
         <button class="btn ghost" data-a="copyText" data-id="${esc(L.id)}">${ico('copy')}Copier en texte</button>
         ${own ? `<button class="btn ghost" data-a="shareLesson" data-id="${esc(L.id)}">${ico('link')}Partager</button>` : ''}</div>
-      ${own ? `<div class="selbar">${selOn
+      <div class="selbar">${selOn
         ? `<button class="btn sm" data-a="pickAll">Tout sélectionner</button><span class="muted small">${nPicked} sélectionné${nPicked > 1 ? 's' : ''}</span>
            <button class="btn sm danger" data-a="delPicked" ${nPicked ? '' : 'disabled'}>Supprimer</button><button class="btn sm ghost" data-a="selMode">Terminer</button>`
-        : `<button class="btn sm" data-a="selMode">${ico('check')}Sélectionner plusieurs mots</button><button class="btn sm" data-a="addToLesson" data-id="${esc(L.id)}">${ico('plus')}Ajouter des mots</button>
-           <button class="btn sm ghost" data-a="renameLesson" data-id="${esc(L.id)}">Renommer le texte</button><button class="btn sm ghost danger-t" data-a="delLesson" data-id="${esc(L.id)}">Supprimer le texte</button>`}</div>` : ''}
+        : `<button class="btn sm" data-a="selMode">${ico('check')}Sélectionner plusieurs mots</button>
+           ${own ? `<button class="btn sm" data-a="addToLesson" data-id="${esc(L.id)}">${ico('plus')}Ajouter des mots</button>
+             <button class="btn sm ghost" data-a="renameLesson" data-id="${esc(L.id)}">Renommer le texte</button><button class="btn sm ghost danger-t" data-a="delLesson" data-id="${esc(L.id)}">Supprimer le texte</button>`
+             : Object.entries(T).map(([k, t]) => `<button class="btn sm" data-a="newItem" data-t="${k}">${ico('plus')}${t.label}</button>`).join('')}`}</div>
+      ${hid.length ? `<p class="muted small">${hid.length} mot${hid.length > 1 ? 's' : ''} du livre masqué${hid.length > 1 ? 's' : ''} dans ton compte — <button class="link" data-a="restoreHidden" data-id="${esc(L.id)}">tout réafficher</button></p>` : ''}
       <div class="wlist">${rows || '<p class="muted">Aucun mot.</p>'}</div>
       ${V.edit ? editModal() : ''}`;
   }
   function editModal() {
     const it = V.edit === 'new' ? { t: V.newType } : LIB.items[V.edit];
     if (!it) return '';
-    const L = LIB.lessons[it.lessonId], d = L && deckOf(L);
-    const editable = V.edit === 'new' || it.custom || (d && d.user);
-    if (!editable) return `<div class="modal" data-a="closeEdit"><div class="sheet" data-stop>
-      <div class="row between"><h2>${ar(Engine.head(it), 'md')}</h2><span class="lock">${ico('check')}Base officielle</span></div>${itemCard(it)}
-      <p class="muted small">Les mots du livre ne peuvent pas être modifiés. Une erreur ? Signale-la et elle sera corrigée pour tout le monde.</p>
-      <div class="row between"><span></span><button class="btn primary" data-a="closeEdit">Fermer</button></div></div></div>`;
+    const L = LIB.lessons[it.lessonId || V.lesson], d = L && deckOf(L), isBase = !(d && d.user) && !it.custom;
+    const scope = isBase ? (adminOn() ? `<p class="scope admin">${ico('crown')} Mode administrateur : ce changement s'appliquera à TOUS les utilisateurs.</p>` : `<p class="scope">Ce changement ne concerne que ton compte.</p>`) : '';
     return `<div class="modal" data-a="closeEdit"><div class="sheet" data-stop>
-      <h2>${V.edit === 'new' ? 'Nouveau' : 'Modifier'} · ${T[it.t].label}</h2>
+      <h2>${V.edit === 'new' ? 'Nouveau' : 'Modifier'} · ${T[it.t].label}</h2>${scope}
       ${T[it.t].edit.map(f => `<label class="fld">${flabel(f)}<input data-ef="${f}" class="${F[f].isAr ? 'ar-input' : ''}" dir="${F[f].isAr ? 'rtl' : 'ltr'}" value="${esc(it[f] || '')}" autocomplete="off"></label>`).join('')}
       <p class="muted small">Plusieurs réponses possibles : sépare-les par « / ». Préposition avec un sens : إِلَى = aller à / مِنْ = venir de</p>
       <div class="row between">${V.edit !== 'new' ? `<button class="btn danger" data-a="delItem">Supprimer</button>` : '<span></span>'}
       <div class="row"><button class="btn ghost" data-a="closeEdit">Annuler</button><button class="btn primary" data-a="saveItem">Enregistrer</button></div></div>
     </div></div>`;
   }
-  // supprime des mots de mes paquets (ou des ajouts perso)
-  function deleteItems(ids) {
-    const set = new Set(ids);
+  // supprime des mots : de mes paquets (effacés), du livre (masqués pour moi, ou pour tous en mode admin)
+  async function deleteItems(ids) {
+    const set = new Set(ids), baseIds = ids.filter(id => { const it = LIB.items[id]; const L = it && LIB.lessons[it.lessonId]; return it && !it.custom && !(L && deckOf(L).user); });
     for (const d of S().decks) for (const l of d.lessons || []) l.items = (l.items || []).filter(it => !set.has(it.id));
     for (const k of Object.keys(S().custom)) S().custom[k] = S().custom[k].filter(it => !set.has(it.id));
-    for (const id of ids) { for (const c of Object.keys(S().cards)) if (c.startsWith(id + '|')) delete S().cards[c]; delete S().items[id]; delete S().edits[id]; }
+    if (baseIds.length && adminOn()) {
+      try { await Cloud.saveBase(b => { baseIds.forEach(id => { const it = LIB.items[id]; if (it.global) b.added[it.lessonId] = (b.added[it.lessonId] || []).filter(x => x.id !== id); else b.hidden[id] = true; }); }); }
+      catch (e) { toast(e.message, 4000); return; }
+    } else baseIds.forEach(id => { S().hidden[id] = 1; });
+    for (const id of ids) { if (baseIds.includes(id)) continue; for (const c of Object.keys(S().cards)) if (c.startsWith(id + '|')) delete S().cards[c]; delete S().items[id]; delete S().edits[id]; }
     Store.save(); rebuild();
   }
 
@@ -1491,24 +1508,38 @@
     editItem: b => { V.edit = b.dataset.id; render(); },
     newItem: b => { V.edit = 'new'; V.newType = b.dataset.t; render(); },
     closeEdit: () => { V.edit = null; render(); },
-    saveItem: () => {
+    saveItem: async () => {
       const data = {}; app.querySelectorAll('[data-ef]').forEach(i => { data[i.dataset.ef] = i.value.trim(); });
-      const it = LIB.items[V.edit];
-      const ul = it && userDeck(it.deckId) ? userDeck(it.deckId).lessons.find(l => l.id === it.lessonId) : null;
-      const raw = ul ? ul.items.find(x => x.id === it.id) : null;
-      if (raw) Object.assign(raw, data);                       // mot de mon paquet : modifié directement
-      else if (it && it.custom) S().edits[V.edit] = Object.assign(S().edits[V.edit] || {}, data);
-      else { toast('Les mots de la base ne se modifient pas'); return; }
-      Store.save(); rebuild(); V.edit = null; toast('Enregistré'); render();
+      const L = LIB.lessons[V.lesson], ud = L && userDeck(L.deckId);
+      if (V.edit === 'new') {
+        const t = V.newType, hf = t === 'verb' ? 'madi' : 'w';
+        if (!data[hf]) { toast('Le mot arabe est obligatoire'); return; }
+        Object.keys(data).forEach(k => { if (!data[k]) delete data[k]; });
+        const item = Object.assign({ id: 'w' + rid(), t }, data);
+        if (ud) ud.lessons.find(l => l.id === L.id).items.push(item);                       // mon paquet
+        else if (adminOn()) { try { await Cloud.saveBase(b => { (b.added[L.id] = b.added[L.id] || []).push(item); }); } catch (e) { toast(e.message, 4000); return; } }
+        else (S().custom[L.id] = S().custom[L.id] || []).push(item);                         // ajout perso au livre
+      } else {
+        const it = LIB.items[V.edit];
+        const ul = it && userDeck(it.deckId) ? userDeck(it.deckId).lessons.find(l => l.id === it.lessonId) : null;
+        const raw = ul ? ul.items.find(x => x.id === it.id) : null;
+        if (raw) Object.assign(raw, data);                                                   // mot de mon paquet
+        else if (!it.custom && adminOn()) {                                                  // admin : pour tout le monde
+          try { await Cloud.saveBase(b => { if (it.global) { const a = (b.added[it.lessonId] || []).find(x => x.id === it.id); if (a) Object.assign(a, data); } else b.edits[it.id] = Object.assign(b.edits[it.id] || {}, data); }); }
+          catch (e) { toast(e.message, 4000); return; }
+        } else S().edits[V.edit] = Object.assign(S().edits[V.edit] || {}, data);            // perso, ce compte seulement
+      }
+      Store.save(); rebuild(); V.edit = null; toast(adminOn() && !ud ? 'Enregistré pour tout le monde' : 'Enregistré'); render();
     },
-    delItem: () => { if (!confirm('Supprimer ce mot ?')) return; deleteItems([V.edit]); V.edit = null; render(); },
+    delItem: async () => { if (!confirm('Supprimer ce mot ?')) return; await deleteItems([V.edit]); V.edit = null; render(); },
+    restoreHidden: b => { hiddenIn(LIB.lessons[b.dataset.id]).forEach(id => { delete S().hidden[id]; }); Store.save(); rebuild(); render(); },
     selMode: () => { V.selMode = !V.selMode; V.picked = {}; render(); },
     pickItem: b => { V.picked[b.dataset.id] = !V.picked[b.dataset.id]; render(); },
     pickAll: () => { const L = LIB.lessons[V.lesson]; const all = L.items.every(it => V.picked[it.id]); L.items.forEach(it => { V.picked[it.id] = !all; }); render(); },
-    delPicked: () => {
+    delPicked: async () => {
       const ids = Object.keys(V.picked).filter(k => V.picked[k]);
       if (!ids.length || !confirm(`Supprimer ${ids.length} mot${ids.length > 1 ? 's' : ''} ?`)) return;
-      deleteItems(ids); V.picked = {}; V.selMode = false; toast('Supprimé'); render();
+      await deleteItems(ids); V.picked = {}; V.selMode = false; toast('Supprimé'); render();
     },
     renameDeck: b => { const d = userDeck(b.dataset.id); const t = prompt('Nouveau nom du paquet :', d.title); if (!t) return; d.title = t.trim(); Store.save(); rebuild(); render(); },
     delDeck: b => {
@@ -1552,6 +1583,7 @@
   const CHANGE = {
     setNum: b => { S().settings[b.dataset.k] = Math.max(0, +b.value || 0); Store.save(); },
     setBool: b => { S().settings[b.dataset.k] = b.checked; Store.save(); if (b.dataset.k === 'sound' && b.checked) FX.sound.ok(); },
+    setAdmin: b => { S().adminMode = b.checked; Store.save(); render(); },
     importDeck: async b => {
       const data = await readJSON(b); if (!data) return;
       const decks = Array.isArray(data) ? data : [data];
@@ -1681,7 +1713,7 @@
   document.title = I18N.t('Murājaʿa');
   applyTheme();
   Cloud.on(st => {
-    if (st.status === 'ok' || st.status === 'out') { rebuild(); applyTheme(); }
+    rebuild(); if (st.status === 'ok' || st.status === 'out') applyTheme();   // aussi quand la base commune change
     if (V.pendingLive && st.user) { const c = V.pendingLive; V.pendingLive = null; Cloud.joinRoom(c).then(() => openLive(c)).catch(e => { toast(e.message, 4000); render(); }); return; }
     if (!['flash', 'exam', 'rush', 'tf', 'rain', 'anagram', 'live'].includes(V.name)) render();
   });

@@ -1,6 +1,16 @@
 /* Traductions de l'interface : [français, anglais, russe]. {n} = un nombre. */
 (() => {
   const T = [
+    ["Ajoute, corrige ou supprime les mots comme tu veux : ça ne change que ton compte, jamais celui des autres.", "Add, fix or delete words as you like: it only changes your account, never anyone else's.", "Добавляй, исправляй или удаляй слова как хочешь: это меняет только твой аккаунт, а не чужие."],
+    ["Livre", "Book", "Учебник"], ["Crée tes propres paquets de mots, en plus de ceux du livre.", "Create your own word packs, on top of the book's.", "Создавай свои наборы слов в дополнение к учебнику."],
+    ["Mode administrateur", "Admin mode", "Режим администратора"],
+    ["Tes ajouts, corrections et suppressions dans les mots du livre s'appliquent à TOUS les utilisateurs.", "Your additions, fixes and deletions in the book's words apply to ALL users.", "Твои добавления, исправления и удаления в словах учебника применяются ко ВСЕМ пользователям."],
+    ["Désactivé : tes changements ne concernent que ton compte.", "Off: your changes only affect your account.", "Выключено: изменения касаются только твоего аккаунта."],
+    ["Mode administrateur : ce changement s'appliquera à TOUS les utilisateurs.", "Admin mode: this change will apply to ALL users.", "Режим администратора: изменение применится ко ВСЕМ пользователям."],
+    ["Ce changement ne concerne que ton compte.", "This change only affects your account.", "Это изменение касается только твоего аккаунта."],
+    ["perso", "mine", "моё"], ["ajout", "added", "добавлено"], ["modifié", "edited", "изменено"],
+    ["{n} mot du livre masqué dans ton compte —", "{n} book word hidden in your account —", "{n} слово учебника скрыто в твоём аккаунте —"], ["{n} mots du livre masqués dans ton compte —", "{n} book words hidden in your account —", "скрыто слов учебника: {n} —"], ["tout réafficher", "show them all again", "показать все снова"],
+    ["Enregistré pour tout le monde", "Saved for everyone", "Сохранено для всех"], ["Réservé à l'administrateur", "Admin only", "Только для администратора"], ["Le mot arabe est obligatoire", "The Arabic word is required", "Арабское слово обязательно"],
     ["Quelle est la traduction ?", "What's the translation?", "Какой перевод?"], ["Quel est le pluriel ?", "What's the plural?", "Какое множественное число?"],
     ["Quel est le présent ?", "What's the present?", "Какое настоящее время?"], ["Quel est l'impératif ?", "What's the imperative?", "Какое повелительное наклонение?"],
     ["Quel est le masdar ?", "What's the masdar?", "Какой масдар?"], ["Quel est le passé ?", "What's the past?", "Какое прошедшее время?"], ["Quel est le mot ?", "What's the word?", "Какое слово?"],
