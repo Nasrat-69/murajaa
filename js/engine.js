@@ -40,6 +40,11 @@ const Engine = (() => {
     syn: { label: 'Mot → Synonyme', cat: 'syn' },
     syn_r: { label: 'Synonyme → Mot', cat: 'syn' }
   };
+  // centres (markaz) : chacun a ses propres niveaux
+  const CENTERS = [
+    { id: 'ibaanah', name: 'Al-Ibaanah', ar: 'الإِبَانَة', desc: 'Méthode du centre Al-Ibaanah (Le Caire)' },
+    { id: 'furqan', name: 'Al-Furqan', ar: 'الفُرْقَان', desc: 'Méthode du centre Al-Furqan' }
+  ];
   const S = () => Store.S;
   let LIB = { decks: [], items: {}, lessons: {} };
 
@@ -47,7 +52,7 @@ const Engine = (() => {
     const decks = [...(window.DECKS || []), ...S().decks].slice().sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
     const items = {}, lessons = {};
     const out = decks.map(d => ({
-      id: d.id, title: d.title, subtitle: d.subtitle, user: !!d.user,
+      id: d.id, title: d.title, subtitle: d.subtitle, user: !!d.user, center: d.center || 'ibaanah',
       lessons: (d.lessons || []).map(l => {
         const arr = [];
         const add = (it, id, custom) => {
@@ -263,7 +268,7 @@ const Engine = (() => {
   }
 
   return {
-    FIELDS, TYPES, CATS, KINDS, PAIRS, build, get LIB() { return LIB; }, head, headF, examFields, itemsFor,
+    FIELDS, TYPES, CATS, KINDS, PAIRS, CENTERS, build, get LIB() { return LIB; }, head, headF, examFields, itemsFor,
     spec, cards, catCount, srsQueue, srsStats, mastery, lessonMastery, enemies, rng32, shuffle,
     makeExam, qsFromCards, pairsFor, playable, gameQ, tfQ, anagramQ, enc, dec
   };

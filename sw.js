@@ -1,6 +1,6 @@
 /* Cache hors-ligne. Augmenter VERSION à chaque mise à jour des fichiers. */
-const VERSION = 'murajaa-v2';
-const FILES = ['./', 'index.html', 'css/style.css', 'js/arabic.js', 'js/store.js', 'js/fx.js', 'js/engine.js', 'js/app.js', 'data/tamhidi.js', 'manifest.webmanifest', 'icon.svg'];
+const VERSION = 'murajaa-v3';
+const FILES = ['./', 'index.html', 'css/style.css', 'js/config.js', 'js/icons.js', 'js/arabic.js', 'js/store.js', 'js/fx.js', 'js/engine.js', 'js/cloud.js', 'js/app.js', 'data/tamhidi.js', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

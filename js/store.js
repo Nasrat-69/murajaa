@@ -1,49 +1,88 @@
-/* Persistance locale + répétition espacée + XP. Tout reste dans le navigateur (localStorage). */
+/* Persistance locale + répétition espacée + XP + historique. Tout reste dans le navigateur ;
+   si un compte est connecté, cloud.js synchronise ce même objet. */
 const Store = (() => {
   const KEY = 'murajaa.v1';
   const MIN = 60000, DAY = 86400000;
   const defaults = () => ({
-    v: 1, name: '',
+    v: 1, name: '', updatedAt: 0, center: 'ibaanah',
     settings: { harakat: 'none', newPerDay: 20, theme: 'auto', osk: false, sound: true, goal: 60 },
     exam: { n: 15, mode: 'qcm', boss: false },
     rev: { mode: 'srs', dir: 'both', n: 20, what: { tr: true, conj: true, pl: true, ant: false, syn: false } },
     game: { what: { tr: true, conj: true, pl: true, ant: true, syn: true } },
+    live: { n: 10, mode: 'qcm', time: 30 },
     sel: [], cards: {}, items: {}, edits: {}, hidden: {}, custom: {}, decks: [],
-    xp: 0, days: {}, best: { rush: 0, tf: 0, rain: 0, anagram: 0 }, newLog: {}, duels: []
+    xp: 0, days: {}, best: { rush: 0, tf: 0, rain: 0, anagram: 0 }, newLog: {}, duels: [],
+    rivals: {}, liveDone: []
   });
   let S = defaults();
+  let onSave = null;
 
+  function normalize(raw) {
+    const d = defaults();
+    const s = Object.assign(d, raw || {});
+    s.settings = Object.assign(defaults().settings, (raw || {}).settings || {});
+    delete s.settings.kinds;
+    s.exam = Object.assign(defaults().exam, (raw || {}).exam || {});
+    s.rev = Object.assign(defaults().rev, (raw || {}).rev || {});
+    s.rev.what = Object.assign(defaults().rev.what, ((raw || {}).rev || {}).what || {});
+    s.game = { what: Object.assign(defaults().game.what, (((raw || {}).game || {}).what) || {}) };
+    s.live = Object.assign(defaults().live, (raw || {}).live || {});
+    s.best = Object.assign(defaults().best, (raw || {}).best || {});
+    delete s.best.match;
+    return s;
+  }
   function load() {
-    try {
-      const raw = JSON.parse(localStorage.getItem(KEY) || '{}');
-      const d = defaults();
-      S = Object.assign(d, raw);
-      S.settings = Object.assign(d.settings, raw.settings || {});
-      delete S.settings.kinds;
-      S.exam = Object.assign(defaults().exam, raw.exam || {});
-      S.rev = Object.assign(defaults().rev, raw.rev || {});
-      S.rev.what = Object.assign(defaults().rev.what, (raw.rev || {}).what || {});
-      S.game = { what: Object.assign(defaults().game.what, ((raw.game || {}).what) || {}) };
-      S.best = Object.assign(defaults().best, raw.best || {});
-    } catch (e) { S = defaults(); }
+    try { S = normalize(JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { S = defaults(); }
   }
   let t = null;
-  const save = () => { clearTimeout(t); t = setTimeout(saveNow, 120); };
-  function saveNow() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { console.warn('save', e); } }
-  window.addEventListener('beforeunload', saveNow);
+  const save = () => { S.updatedAt = Date.now(); clearTimeout(t); t = setTimeout(saveNow, 120); };
+  function saveNow() {
+    try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { console.warn('save', e); }
+    if (onSave) onSave();
+  }
+  window.addEventListener('beforeunload', () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* plein */ } });
   document.addEventListener('visibilitychange', () => { if (document.hidden) saveNow(); });
+
+  /* fusion de deux progressions (appareil ↔ compte) */
+  function merge(a, b) {
+    const newer = (a.updatedAt || 0) >= (b.updatedAt || 0) ? a : b, older = newer === a ? b : a;
+    const m = normalize(JSON.parse(JSON.stringify(newer)));
+    for (const [k, c] of Object.entries(older.cards || {})) { const n = m.cards[k]; if (!n || (c.last || 0) > (n.last || 0)) m.cards[k] = c; }
+    for (const [k, c] of Object.entries(older.items || {})) { const n = m.items[k]; m.items[k] = n ? { ok: Math.max(n.ok, c.ok), err: Math.max(n.err, c.err) } : c; }
+    for (const [k, c] of Object.entries(older.days || {})) {
+      const n = m.days[k];
+      m.days[k] = n ? { xp: Math.max(n.xp || 0, c.xp || 0), n: Math.max(n.n || 0, c.n || 0), ok: Math.max(n.ok || 0, c.ok || 0), err: Math.max(n.err || 0, c.err || 0) } : c;
+    }
+    for (const [k, v] of Object.entries(older.best || {})) m.best[k] = Math.max(m.best[k] || 0, v || 0);
+    for (const [k, v] of Object.entries(older.rivals || {})) if (!m.rivals[k] || (v.at || 0) > (m.rivals[k].at || 0)) m.rivals[k] = v;
+    m.liveDone = [...new Set([...(m.liveDone || []), ...(older.liveDone || [])])].slice(-200);
+    m.xp = Math.max(a.xp || 0, b.xp || 0);
+    m.name = m.name || older.name;
+    m.updatedAt = Math.max(a.updatedAt || 0, b.updatedAt || 0);
+    return m;
+  }
+  function replace(next) { S = normalize(next); try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* plein */ } }
 
   const today = (d = new Date()) => {
     const z = new Date(d.getTime() - d.getTimezoneOffset() * MIN);
     return z.toISOString().slice(0, 10);
   };
-  function dayRec() { const d = today(); return (S.days[d] = S.days[d] || { xp: 0, n: 0 }); }
+  function dayRec() { const d = today(); return (S.days[d] = S.days[d] || { xp: 0, n: 0, ok: 0, err: 0 }); }
   function addXP(n) { S.xp += n; dayRec().xp += n; save(); }
   function streak() {
     const d = new Date(); let n = 0;
     if (!S.days[today(d)]) d.setDate(d.getDate() - 1);
     while (S.days[today(d)]) { n++; d.setDate(d.getDate() - 1); }
     return n;
+  }
+  function bestStreak() {
+    const ks = Object.keys(S.days).sort(); let best = 0, cur = 0, prev = null;
+    for (const k of ks) {
+      const d = new Date(k + 'T12:00:00');
+      cur = prev && Math.round((d - prev) / DAY) === 1 ? cur + 1 : 1;
+      best = Math.max(best, cur); prev = d;
+    }
+    return best;
   }
   function level(xp = S.xp) {
     const lvl = Math.floor(Math.sqrt(xp / 40)) + 1;
@@ -72,7 +111,9 @@ const Store = (() => {
     if (!S.cards[id]) S.newLog[today()] = newToday() + 1;
     const c = nextState(S.cards[id], g);
     if (c.ivl > 3) { c.ivl *= 0.95 + Math.random() * 0.1; c.due = Date.now() + c.ivl * DAY; }
-    S.cards[id] = c; dayRec().n++; save();
+    S.cards[id] = c;
+    const r = dayRec(); r.n++; if (g >= 3) r.ok++; else if (g === 1) r.err++;
+    save();
   }
   function preview(id, g) {
     const c = nextState(S.cards[id], g);
@@ -83,14 +124,18 @@ const Store = (() => {
   // résultat d'examen / jeu : statistiques + une erreur ramène le mot en révision
   function answer(itemId, ok) {
     const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 });
-    if (ok) r.ok++; else {
-      r.err++;
+    const d = dayRec(); d.n++;
+    if (ok) { r.ok++; d.ok++; } else {
+      r.err++; d.err++;
       const now = Date.now();
       for (const k in S.cards) if (k.startsWith(itemId + '|')) S.cards[k].due = Math.min(S.cards[k].due, now);
     }
-    dayRec().n++; save();
+    save();
   }
 
   load();
-  return { get S() { return S; }, set S(v) { S = v; }, save, saveNow, load, defaults, today, addXP, streak, level, newToday, grade, preview, answer, KEY };
+  return {
+    get S() { return S; }, set S(v) { S = v; }, set onSave(f) { onSave = f; },
+    save, saveNow, load, defaults, normalize, merge, replace, today, addXP, streak, bestStreak, level, newToday, grade, preview, answer, KEY
+  };
 })();

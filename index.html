@@ -4,27 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Murājaʿa</title>
-<meta name="description" content="Révision du vocabulaire d'Al-Ibaanah : cartes, examens à trous, jeux et duels.">
+<meta name="description" content="Révision du vocabulaire arabe (Al-Ibaanah, Al-Furqan) : cartes, examens à trous, jeux et duels en direct.">
 <meta name="theme-color" content="#4255ff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<script src="js/config.js"></script>
+<script>
+  // Firebase (comptes + duel en direct) chargé seulement s'il est configuré
+  if (window.FIREBASE_CONFIG) {
+    ['firebase-app-compat', 'firebase-auth-compat', 'firebase-firestore-compat'].forEach(function (f) {
+      document.write('<script src="https://www.gstatic.com/firebasejs/10.12.2/' + f + '.js"><\/script>');
+    });
+  }
+</script>
 </head>
 <body>
 <div id="app"></div>
 <div id="osk" class="osk hidden" aria-label="Clavier arabe"></div>
 <div id="toast" class="toast" role="status"></div>
-<!-- Paquets de mots (ajouter les niveaux ici) -->
+<div id="tip" class="tip" role="tooltip"></div>
+<!-- Paquets de mots (un fichier par niveau) -->
 <script src="data/tamhidi.js"></script>
 <!-- Application -->
+<script src="js/icons.js"></script>
 <script src="js/arabic.js"></script>
 <script src="js/store.js"></script>
 <script src="js/fx.js"></script>
 <script src="js/engine.js"></script>
+<script src="js/cloud.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

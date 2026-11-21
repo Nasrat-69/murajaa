@@ -6,6 +6,7 @@
    IMPORTANT : ne pas réordonner les mots (l'identifiant = position), ajouter à la fin. */
 (window.DECKS = window.DECKS || []).push({
   id: 'tamhidi',
+  center: 'ibaanah',
   title: 'المُسْتَوَى التَّمْهِيدِيّ',
   subtitle: 'Niveau préparatoire',
   order: 0,

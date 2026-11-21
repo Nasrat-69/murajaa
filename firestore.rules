@@ -1,0 +1,29 @@
+rules_version = '2';
+// Règles de sécurité Firestore pour Murājaʿa.
+// À coller dans la console Firebase → Firestore Database → Règles → Publier.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Progression privée : seul le propriétaire lit et écrit
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Profil public (prénom, XP, série) : visible par les joueurs connectés, modifiable par son propriétaire
+    match /profiles/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Salles de duel en direct
+    match /rooms/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.host == request.auth.uid;
+      allow update: if request.auth != null && (
+        request.auth.uid in resource.data.players ||
+        (resource.data.state == 'lobby' && resource.data.players.size() < 2)
+      );
+      allow delete: if request.auth != null && resource.data.host == request.auth.uid;
+    }
+  }
+}
