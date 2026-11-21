@@ -86,22 +86,31 @@ const Engine = (() => {
   const examFields = it => (TYPES[it.t] || TYPES.expr).exam.filter(f => it[f]);
   const itemsFor = ids => ids.flatMap(id => (LIB.lessons[id] ? LIB.lessons[id].items : []));
 
-  /* ---- prépositions : « إِلَى = aller vers / مِنْ = venir de » ---- */
+  /* ---- prépositions : « إِلَى = revenir à : رَجَعَ إِلَى بَلَدِهِ / مِنْ = revenir de : رَجَعَ مِنَ السُّوقِ »
+     chaque préposition a son sens et, si possible, sa propre phrase d'exemple ---- */
+  const AR_RE = /[؀-ۿ]/;
   function parsePreps(it) {
-    if (!it.prep) return [];
-    return String(it.prep).split(/\s*[\/؛;]\s*/).map(s => {
-      const m = s.match(/^(.*?)\s*(?:=|\(|:)\s*(.*?)\)?\s*$/);
-      const p = (m ? m[1] : s).trim(), fr = m ? m[2].trim() : '';
-      return p ? { p, fr } : null;
+    const raw = it.prepAll || it.prep;
+    if (!raw) return [];
+    return String(raw).split(/\s*[\/؛;]\s*/).map(s => {
+      const eq = s.indexOf('=');
+      let p = (eq >= 0 ? s.slice(0, eq) : s).trim(), rest = eq >= 0 ? s.slice(eq + 1).trim() : '', ex = '';
+      // exemple : après « : » ou entre parenthèses, en arabe
+      const c = rest.match(/\s*[:：]\s*(.*[؀-ۿ].*)$/);
+      if (c) { ex = c[1].trim(); rest = rest.slice(0, c.index).trim(); }
+      const par = rest.match(/\(([^)]*[؀-ۿ][^)]*)\)/);
+      if (par) { ex = ex || par[1].trim(); rest = rest.replace(par[0], '').trim(); }
+      if (!AR_RE.test(p)) return null;
+      return { p, fr: rest, ex };
     }).filter(Boolean);
   }
-  // une copie du mot par préposition (pour les jeux et les examens)
+  // une copie du mot par préposition (pour les jeux et les examens) : le sens de la préposition reste séparé du sens du verbe
   function expandPreps(items) {
     const out = [];
     for (const it of items) {
       const ps = parsePreps(it);
-      if (ps.length <= 1) out.push(ps.length ? Object.assign({}, it, { prep: ps[0].p, prepFr: ps[0].fr }) : it);
-      else ps.forEach((e, i) => out.push(Object.assign({}, it, { prep: e.p, prepFr: e.fr, fr: e.fr || it.fr, vid: it.id + '#' + i })));
+      if (!ps.length || it.t !== 'verb') { out.push(it); continue; }
+      ps.forEach((e, i) => out.push(Object.assign({}, it, { prepAll: it.prepAll || it.prep, prep: e.p, prepFr: e.fr, prepEx: e.ex, vid: ps.length > 1 ? it.id + '#' + i : undefined })));
     }
     return out;
   }
@@ -114,7 +123,7 @@ const Engine = (() => {
     if (pm) {
       if (it.t !== 'verb') return null;
       const e = parsePreps(it)[+pm[1]];
-      return e ? { p: [h], a: ['prep'], item: Object.assign({}, it, { prep: e.p, prepFr: e.fr, fr: e.fr || it.fr }) } : null;
+      return e ? { p: [h], a: ['prep'], item: Object.assign({}, it, { prepAll: it.prepAll || it.prep, prep: e.p, prepFr: e.fr, prepEx: e.ex }) } : null;
     }
     switch (kind) {
       case 'arfr': return it.fr ? { p: [h], a: ['fr'] } : null;
@@ -220,7 +229,8 @@ const Engine = (() => {
   function distractors(it, f, pool, rng, count) {
     const seen = new Set([keyOf(f, it[f])]), cands = [];
     const push = v => { if (!v) return; const k = keyOf(f, v); if (seen.has(k)) return; seen.add(k); cands.push(v); };
-    if (f === 'prep') { shuffle(HURUF.slice(), rng).forEach(push); return cands.slice(0, count); }
+    // prépositions : jamais une autre préposition valable du même verbe (sinon deux bonnes réponses)
+    if (f === 'prep') { parsePreps(it).forEach(e => seen.add(keyOf(f, e.p))); shuffle(HURUF.slice(), rng).forEach(push); return cands.slice(0, count); }
     shuffle(pool.filter(o => o.t === it.t), rng).forEach(o => push(o[f]));
     if (cands.length < count) pool.forEach(o => push(o[f]));
     if (cands.length < count) Object.values(LIB.items).sort((a, b) => (a.id < b.id ? -1 : 1)).forEach(o => push(o[f]));

@@ -509,6 +509,17 @@ details { border-bottom: 1px solid var(--line); padding: 6px 0; } summary { curs
 .tf-side .flabel, .given > .flabel, .drop .flabel, .pgiven .flabel { margin-bottom: 4px; position: relative; z-index: 1; }
 .ar.xxl, .ar.xl { display: inline-block; padding-top: .15em; }
 
+/* ===== Prépositions : harf + sens + exemple ===== */
+.prep-ans { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 10px; width: 100%; }
+.pa-row { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.pa-eq { color: var(--muted); font-weight: 700; font-size: 1.3rem; }
+.pa-fr { font-size: 1.35rem; font-weight: 800; }
+.prep-ans .ex { width: 100%; text-align: center; }
+.preps { width: 100%; display: flex; flex-direction: column; gap: 6px; margin: 10px 0; text-align: start; }
+.pr { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 12px; background: var(--surface-2); border-radius: 12px; padding: 4px 12px; border: 1.5px solid transparent; }
+.pr .ar { grid-row: span 2; } .pr-fr { font-weight: 700; } .pr-ex { color: var(--muted); direction: rtl; text-align: right; }
+.pr.cur { border-color: var(--primary); background: var(--primary-soft); }
+
 /* ===== Accueil : duel en direct ===== */
 .livehero { margin-top: 14px; background: var(--surface); border: 1.5px solid color-mix(in srgb, var(--c-live) 40%, var(--line)); border-radius: 20px; padding: 16px 18px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
 .livehero::before { content: ''; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--c-live); }

@@ -230,7 +230,7 @@
     ["Mon compte", "My account", "Мой аккаунт"],
     // divers
     ["Réponds", "Answer", "Ответь"], ["Envoie les photos de tes cours", "Send photos of your lessons", "Пришли фото своих уроков"],
-    ["Pas encore", "Not yet", "Пока нет"], ["Mes mots", "My words", "Мои слова"], ["tes niveaux", "your levels", "твои уровни"], ["Page {n}", "Page {n}", "Страница {n}"], ["{n} mots selon ta sélection —", "{n} words from your selection —", "{n} слов по твоему выбору —"], ["Toi", "You", "Ты"], ["Ami", "Friend", "Друг"]
+    ["Pas encore", "Not yet", "Пока нет"], ["Avec ce verbe", "With this verb", "С этим глаголом"], ["Mes mots", "My words", "Мои слова"], ["tes niveaux", "your levels", "твои уровни"], ["Page {n}", "Page {n}", "Страница {n}"], ["{n} mots selon ta sélection —", "{n} words from your selection —", "{n} слов по твоему выбору —"], ["Toi", "You", "Ты"], ["Ami", "Friend", "Друг"]
   ];
   const en = {}, ru = {};
   for (const [f, e, r] of T) { en[f] = e; ru[f] = r; }

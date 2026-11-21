@@ -152,13 +152,21 @@
       return `<button class="wchip ${obj[k] ? 'on' : ''} ${n ? '' : 'empty'}" data-a="${action}" data-k="${k}">${ico(CAT_ICON[k])}<b>${c.label}</b><small>${n} mots</small><i class="tick">${ico('check')}</i></button>`;
     }).join('')}</div>`;
   }
+  // toutes les prépositions d'un verbe, chacune avec son sens (et son exemple)
+  function prepList(it, current) {
+    const ps = Engine.parsePreps(it);
+    if (!ps.length || (current && ps.length < 2)) return '';
+    return `<div class="preps">${current ? `<span class="flabel">${esc('Avec ce verbe')}</span>` : flabel('prep')}
+      ${ps.map(e => `<div class="pr ${current && AR.letters(e.p) === AR.letters(current) ? 'cur' : ''}">${ar(e.p, 'md')}<span class="pr-fr">${esc(e.fr)}</span>${e.ex ? `<span class="pr-ex">${ar(e.ex, 'sm')}</span>` : ''}</div>`).join('')}</div>`;
+  }
+  const prepHint = q => (q.to === 'prep' && q.item.prepFr ? `<div class="sub muted small">${esc('sens : ' + q.item.prepFr)}</div>` : '');
   function itemCard(it, compact = false, skip = []) {
     const cell = f => (it[f] && !skip.includes(f) ? `<div class="cell">${flabel(f)}${val(f, it[f], 'lg')}</div>` : '');
     const grid = it.t === 'verb' ? ['madi', 'mud', 'amr', 'masdar'] : ['w', 'fem', 'pl', 'syn', 'ant'];
     return `<div class="icard ${compact ? 'compact' : ''}">
       <div class="cells">${grid.map(cell).join('')}</div>
       ${it.fr && !skip.includes('fr') ? `<div class="tr">${esc(it.fr)}</div>` : ''}
-      ${it.prep ? `<div class="line">${flabel('prep')} ${ar(it.prep)}</div>` : ''}
+      ${it.prep && !skip.includes('prep') ? prepList(it) : ''}
       ${it.ex ? `<div class="ex">${ar(it.ex)}</div>` : ''}
       ${it.note ? `<div class="note">${esc(it.note)}</div>` : ''}
     </div>`;
@@ -271,6 +279,12 @@
       if (c.kind === 'frar') h += `<div class="sub muted">${esc(T[it.t] ? T[it.t].label : '')}</div>`;
       if (/^prep/.test(c.kind)) h += `<div class="sub muted">${it.prepFr ? 'sens : ' + esc(it.prepFr) : esc(it.fr || '')}</div>`;
       return h + `<div class="ask">${c.a.map(f => esc(F[f].fr)).join(' · ')} ?</div>`;
+    }
+    if (/^prep/.test(c.kind)) {
+      // préposition : le harf avec SON sens, SA phrase, puis les autres prépositions du verbe pour comparer
+      return `<div class="prep-ans">${flabel('prep')}<div class="pa-row">${ar(it.prep, 'xl')}<span class="pa-eq">=</span><span class="pa-fr">${esc(it.prepFr || it.fr)}</span></div>
+        ${it.prepEx ? `<div class="ex">${ar(it.prepEx)}</div>` : ''}</div>
+        ${prepList(it, it.prep)}${itemCard(Object.assign({}, it, { ex: '' }), true, ['prep'])}`;
     }
     return `<div class="ans">${c.a.map(f => `<div class="av2">${flabel(f)}${val(f, it[f], 'xl')}</div>`).join('')}</div>${itemCard(it, true, c.a)}`;
   }
@@ -530,7 +544,7 @@
     };
     const allOk = fb && q.hidden.every(f => cur[f].ok);
     return `<div class="qcard ${fb ? (allOk ? 'pulse-ok' : 'shake') : ''}"><div class="given">${tag ? `<div class="qtag">${tag}</div>` : ''}${flabel(q.given)}<div class="gval">${val(q.given, it[q.given], 'xxl')}</div>
-        <div class="typ">${esc(T[it.t] ? T[it.t].label : '')}${it.prep && q.given !== 'fr' ? ` · ${ar(it.prep, 'sm')}` : ''}</div></div>
+        <div class="typ">${esc(T[it.t] ? T[it.t].label : '')}${q.hidden.includes('prep') && it.prepFr ? ` · ${esc('sens : ' + it.prepFr)}` : ''}</div></div>
         <div class="holes">${q.hidden.map(hole).join('')}</div></div>`;
   }
   function grade_q(q, mode, pick, level) {
@@ -558,7 +572,7 @@
       ${fb
         ? `<div class="fbbar ${allOk ? 'ok' : 'ko'}"><div class="fbh"><b>${allOk ? pickCheer() : 'Pas tout à fait'}</b>
             ${!allOk ? `<button class="link" data-a="override">J'avais juste</button>` : ''}</div>
-            ${q.item.ex ? `<div class="ex">${ar(q.item.ex)}</div>` : ''}
+            ${(q.hidden.includes('prep') ? q.item.prepEx : q.item.ex) ? `<div class="ex">${ar(q.hidden.includes('prep') ? q.item.prepEx : q.item.ex)}</div>` : ''}
             <button class="btn lg wide ${allOk ? 'success' : 'danger'}" data-a="examNext" autofocus>Continuer <kbd>Entrée</kbd></button></div>`
         : `<button class="btn primary lg wide" data-a="examCheck">Valider <kbd>Entrée</kbd></button>`}`;
   };
@@ -695,7 +709,7 @@
     if (V.over) return overScreen('rush', [[V.score, 'points'], [V.n, 'réponses'], ['×' + V.maxCombo, 'meilleure série']]);
     const q = V.q;
     return `${gtop(comboTag())}
-      <div class="qcard game-card ${V.fb ? (V.fb.ok ? 'pulse-ok' : 'shake') : 'card-in'}"><div class="given">${flabel(q.from)}<div class="gval">${val(q.from, q.item[q.from], 'xxl')}</div></div>
+      <div class="qcard game-card ${V.fb ? (V.fb.ok ? 'pulse-ok' : 'shake') : 'card-in'}"><div class="given">${flabel(q.from)}<div class="gval">${val(q.from, q.item[q.from], 'xxl')}</div>${prepHint(q)}</div>
         <div class="hole">${flabel(q.to)}<div class="opts ${F[q.to].isAr ? 'ar-opts' : ''}">${q.options.map((o, k) => {
           let cl = ''; if (V.fb) cl = o === q.answer ? 'good' : (V.fb.k === k ? 'bad' : 'dim');
           return `<button class="opt ${cl}" data-a="rushPick" data-k="${k}"><kbd>${k + 1}</kbd>${val(q.to, o)}</button>`;
@@ -719,7 +733,7 @@
     const q = V.q, fb = V.fb;
     return `${gtop(comboTag())}
       <div class="tf-card ${fb ? (fb.ok ? 'pulse-ok' : 'shake') : 'card-in'}">
-        <div class="tf-side">${flabel(q.from)}${val(q.from, q.item[q.from], 'xxl')}</div>
+        <div class="tf-side">${flabel(q.from)}${val(q.from, q.item[q.from], 'xxl')}${prepHint(q)}</div>
         <div class="tf-eq">=</div>
         <div class="tf-side">${flabel(q.to)}${val(q.to, q.shown, 'xl')}</div>
         ${fb && !fb.ok && !q.truth ? `<div class="tf-fix">Bonne réponse : ${val(q.to, q.item[q.to], 'md')}</div>` : ''}
@@ -748,7 +762,7 @@
     return `<div class="stop game"><button class="icon quit" data-a="quit" aria-label="Quitter">${ico('x')}</button>
         ${hearts(V.lives)}<span class="pts">${V.score} mots</span></div>
       <div class="arena ${fb && !fb.ok ? 'hit' : ''}">
-        <div class="drop ${fb ? (fb.ok ? 'pop' : 'splash') : ''}" style="animation-duration:${V.speed}ms">${flabel(q.from)}${val(q.from, q.item[q.from], 'xl')}</div>
+        <div class="drop ${fb ? (fb.ok ? 'pop' : 'splash') : ''}" style="animation-duration:${V.speed}ms">${flabel(q.from)}${val(q.from, q.item[q.from], 'xl')}${prepHint(q)}</div>
         <div class="ground"></div>
         ${fb && !fb.ok ? `<div class="rain-ans">${val(q.to, q.answer, 'lg')}</div>` : ''}
       </div>
