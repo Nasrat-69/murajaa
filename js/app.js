@@ -57,6 +57,26 @@
     return p && p.photo ? `<img class="av ${cls}" src="${esc(p.photo)}" alt="" referrerpolicy="no-referrer">` : `<span class="av ${cls}">${esc(name.slice(0, 1).toUpperCase())}</span>`;
   }
   const me = () => ({ name: S().name || 'Moi', photo: Cloud.st.user ? Cloud.st.user.photoURL : '' });
+  // navigateur intégré (WhatsApp, Instagram, Messenger…) : la connexion Google n'y fonctionne pas
+  const IN_APP = (() => { const u = navigator.userAgent || ''; return /FBAN|FBAV|FB_IAB|Instagram|WhatsApp|Line\/|Snapchat|Messenger|; wv\)|GSA\//i.test(u) || (/iPhone|iPad|iPod/.test(u) && !/Safari\//.test(u)); })();
+  const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent || '');
+  let inappHelp = false;
+  const appLink = () => location.origin + location.pathname;
+  function inappNotice() {
+    return IN_APP ? `<div class="notice">${ico('globe')}<div><b>Ouvre l'appli dans ${IS_IOS ? 'Safari' : 'Chrome'} pour te connecter.</b><small>La connexion Google ne marche pas dans le navigateur de WhatsApp ou d'Instagram.</small>
+      <button class="link" data-a="inappHelp">Comment faire ?</button></div></div>` : '';
+  }
+  function inappModal() {
+    return `<div class="modal" data-a="closeInapp"><div class="sheet" data-stop>
+      <h2>${ico('globe')} Ouvre l'appli dans ${IS_IOS ? 'Safari' : 'Chrome'}</h2>
+      <p class="muted">Google bloque la connexion quand le lien est ouvert depuis WhatsApp (ou Instagram, Messenger…). Il faut l'ouvrir dans le vrai navigateur du téléphone.</p>
+      <ol class="steps">${IS_IOS
+        ? '<li>Touche l\'icône <b>Partager</b> (carré avec une flèche) ou les <b>…</b> en bas de l\'écran.</li><li>Choisis <b>Ouvrir dans Safari</b>.</li><li>Dans Safari, reconnecte-toi avec Google.</li>'
+        : '<li>Touche les <b>⋮</b> en haut à droite.</li><li>Choisis <b>Ouvrir dans Chrome</b> (ou « Ouvrir dans le navigateur »).</li><li>Dans Chrome, reconnecte-toi avec Google.</li>'}</ol>
+      <p class="muted small">Sinon : copie le lien et colle-le dans ${IS_IOS ? 'Safari' : 'Chrome'}.</p>
+      <div class="row wrap"><button class="btn primary" data-a="copy" data-text="${esc(appLink())}">${ico('copy')}Copier le lien</button><button class="btn ghost" data-a="closeInapp">Fermer</button></div>
+    </div></div>`;
+  }
 
   /* ---------- rendu ---------- */
   const SESSION = ['flash', 'exam', 'rush', 'tf', 'rain', 'anagram', 'live'];
@@ -68,7 +88,7 @@
     const html = (VIEWS[V.name] || VIEWS.home)();
     const session = SESSION.includes(V.name);
     const enter = V.name !== lastView; lastView = V.name;
-    app.innerHTML = (session ? '' : header()) + `<main class="main ${session ? 'session' : ''} ${enter ? 'enter' : ''}">${html}</main>` + (session ? '' : nav());
+    app.innerHTML = (session ? '' : header()) + `<main class="main ${session ? 'session' : ''} ${enter ? 'enter' : ''}">${html}</main>` + (session ? '' : nav()) + (inappHelp ? inappModal() : '');
     if (!enter) app.querySelectorAll('.hole-in:not([readonly])').forEach(i => { if (drafts[i.dataset.f] != null && !i.value) i.value = drafts[i.dataset.f]; if (focusF === i.dataset.f) i.focus({ preventScroll: true }); });
     const af = app.querySelector('[autofocus]'); if (af && !focusF && !matchMedia('(pointer:coarse)').matches) af.focus({ preventScroll: true });
     OSK.refresh();
@@ -645,7 +665,7 @@
   };
   function needAccount(msg) {
     if (!Cloud.st.enabled) return `<section class="panel empty">${ico('cloud', 'big')}<h3>Les comptes ne sont pas encore activés</h3><p class="muted">${msg} Il faut d'abord brancher l'appli sur Firebase (gratuit). En attendant, utilise l'onglet « Sans compte ».</p></section>`;
-    if (!Cloud.st.user) return `<section class="panel empty">${ico('user', 'big')}<h3>Connecte-toi pour jouer en direct</h3><p class="muted">${msg}</p><button class="btn google" data-a="signIn">${GOOGLE_G}Continuer avec Google</button></section>`;
+    if (!Cloud.st.user) return `<section class="panel empty">${ico('user', 'big')}<h3>Connecte-toi pour jouer en direct</h3><p class="muted">${msg}</p>${inappNotice()}<button class="btn google" data-a="signIn">${GOOGLE_G}Continuer avec Google</button></section>`;
     return '';
   }
   function liveHome() {
@@ -956,7 +976,7 @@
     let acc;
     if (!c.enabled) acc = `<section class="panel empty">${ico('cloud', 'big')}<h3>Comptes bientôt disponibles</h3><p class="muted">Pour se connecter avec Google et retrouver sa progression sur tous ses appareils, l'appli doit être reliée à Firebase. Ta progression reste enregistrée sur cet appareil en attendant.</p></section>`;
     else if (!u) acc = `<section class="panel empty">${ico('user', 'big')}<h3>Crée ton compte</h3><p class="muted">Avec ton compte Google : ta progression est sauvegardée et synchronisée sur ton téléphone et ton PC, et tu peux jouer en direct avec ton binôme.</p>
-      <button class="btn google lg" data-a="signIn">${GOOGLE_G}Continuer avec Google</button>${c.error ? `<p class="warn">${esc(c.error)}</p>` : ''}</section>`;
+      ${inappNotice()}<button class="btn google lg" data-a="signIn">${GOOGLE_G}Continuer avec Google</button>${c.error ? `<p class="warn">${esc(c.error)}</p>` : ''}</section>`;
     else acc = `<section class="panel profile">${avatar({ name: S().name || u.displayName, photo: u.photoURL }, 'lg')}<div><h2>${esc(S().name || u.displayName || '')}</h2><p class="muted small">${esc(u.email || '')}</p>
         <p class="sync ${c.status}">${ico(c.status === 'error' ? 'x' : 'cloud')}${status}${c.lastSync ? ` · ${new Date(c.lastSync).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : ''}</p></div>
         <div class="row wrap"><button class="btn sm" data-a="syncNow">${ico('repeat')}Synchroniser</button><button class="btn sm ghost" data-a="signOut">${ico('logout')}Se déconnecter</button></div></section>`;
@@ -1124,7 +1144,12 @@
     },
     copy: b => copy(b.dataset.text),
     // compte
-    signIn: async () => { try { await Cloud.signIn(); } catch (e) { toast('Connexion impossible : ' + (e.message || e.code), 5000); } },
+    signIn: async () => {
+      try { await Cloud.signIn(); }
+      catch (e) { if (e.code === 'inapp') { inappHelp = true; render(); } else toast('Connexion impossible : ' + (e.message || e.code), 5000); }
+    },
+    inappHelp: () => { inappHelp = true; render(); },
+    closeInapp: () => { inappHelp = false; render(); },
     signOut: async () => { if (!confirm('Se déconnecter ? Ta progression reste aussi sur cet appareil.')) return; await Cloud.signOut(); toast('Déconnecté'); render(); },
     syncNow: async () => { await Cloud.pull(); rebuild(); render(); toast('Synchronisé'); },
     // duel en direct

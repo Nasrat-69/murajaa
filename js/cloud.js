@@ -29,10 +29,13 @@ const Cloud = (() => {
     if (!st.enabled) throw new Error('Comptes non configurés');
     const p = new firebase.auth.GoogleAuthProvider();
     p.setCustomParameters({ prompt: 'select_account' });
+    // pas de « redirect » : sur GitHub Pages il échoue dans les navigateurs qui cloisonnent le stockage (iOS, WhatsApp…)
     try { await auth.signInWithPopup(p); }
     catch (e) {
-      if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment') return auth.signInWithRedirect(p);
       if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request') return;
+      if (e.code === 'auth/popup-blocked' || e.code === 'auth/operation-not-supported-in-this-environment' || e.code === 'auth/web-storage-unsupported') {
+        const err = new Error('inapp'); err.code = 'inapp'; throw err;
+      }
       throw e;
     }
   }
