@@ -697,3 +697,17 @@ body.call-on .main.session { padding-bottom: 200px; }
   .mrow { grid-template-columns: minmax(0, 1fr) 1fr auto; gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+/* niveaux repliables */
+.pdeck-tg { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 0; color: inherit; cursor: pointer; text-align: start; font: inherit; }
+.pdeck-tg.wide { width: 100%; }
+.pdeck-tg.wide .lock { margin-inline-start: auto; }
+.pchev { width: 18px; height: 18px; flex: none; color: var(--muted); transition: transform .2s; }
+.open > .pdeck-h .pchev, .pdeck-w.open .pchev { transform: rotate(90deg); color: var(--primary); }
+.pcount { background: var(--primary); color: #fff; border-radius: 99px; font-size: .75rem; font-weight: 700; padding: 1px 8px; }
+.pdeck-w .lrow:first-of-type { margin-top: 10px; }
+.soonlv { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.soonchip { display: inline-flex; flex-direction: column; align-items: center; border: 1.5px dashed var(--line); border-radius: 10px; padding: 4px 10px; opacity: .7; }
+.soonchip small { color: var(--muted); font-size: .7rem; }
+.pdeck.soon, .pdeck-w.soon { opacity: .55; border-style: dashed; }
+.pdeck-w.soon { padding-block: 10px; }

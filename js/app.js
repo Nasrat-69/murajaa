@@ -129,19 +129,24 @@
       return `<button class="center ${S().center === c.id ? 'on' : ''}" data-a="setCenter" data-v="${c.id}">${ar(c.ar, 'sm')}<b>${esc(c.name)}</b><small>${n ? n + ' mots' : 'bientôt'}</small></button>`;
     }).join('')}</div>`;
   }
+  // niveaux repliés / dépliés (sélecteur et page Mots)
+  const OPEN = new Set();
+  const soonRow = soon => soon.length ? `<div class="soonlv"><small class="muted">Bientôt :</small>${soon.map(d => `<span class="soonchip">${ar(d.title, 'sm')}<small>${esc(d.subtitle || '')}</small></span>`).join('')}</div>` : '';
   function picker() {
     const s = S().sel, decks = centerDecks();
     if (!decks.length) return emptyCenter();
     const none = !s.some(id => decks.some(d => d.lessons.some(l => l.id === id)));
     return `<div class="picker">${centerSwitch()}${decks.map(d => {
+      if (!d.lessons.length) return `<div class="pdeck soon"><div class="pdeck-h"><span class="pdeck-tg">${ico('lock', 'pchev')}<span class="pdeck-t">${ar(d.title, 'sm')}<small>${esc(d.subtitle || '')} · bientôt</small></span></span></div></div>`;
       const ids = d.lessons.map(l => l.id), on = ids.filter(id => s.includes(id)).length;
       const all = ids.length && on === ids.length;
       const words = d.lessons.reduce((a, l) => a + l.items.length, 0);
-      return `<div class="pdeck ${on || none ? 'has' : ''}">
-        <div class="pdeck-h"><div class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')} · ${words} mots</small></div>
+      const open = OPEN.has(d.id);
+      return `<div class="pdeck ${on ? 'has' : ''} ${open ? 'open' : ''}">
+        <div class="pdeck-h"><button class="pdeck-tg" data-a="togDeck" data-id="${esc(d.id)}" aria-expanded="${open}">${ico('chevron', 'pchev')}<span class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')} · ${d.lessons.length} textes · ${words} mots</small></span>${on ? `<span class="pcount">${on}</span>` : ''}</button>
           <button class="chip-btn ${all ? 'on' : ''}" data-a="selDeck" data-id="${esc(d.id)}">${all ? ico('check') : ''}Tout le niveau</button></div>
-        <div class="pchips">${d.lessons.map(l => `<button class="pchip ${s.includes(l.id) ? 'on' : ''}" data-a="selLesson" data-id="${esc(l.id)}">
-          <span>${esc(l.title)}</span><small>${l.items.length}</small></button>`).join('')}</div></div>`;
+        ${open ? `<div class="pchips">${d.lessons.map(l => `<button class="pchip ${s.includes(l.id) ? 'on' : ''}" data-a="selLesson" data-id="${esc(l.id)}">
+          <span>${esc(l.title)}</span><small>${l.items.length}</small></button>`).join('')}</div>` : ''}</div>`;
     }).join('')}
     <p class="hint">${none ? 'Rien de coché : tout le centre est inclus.' : `${Engine.itemsFor(sel()).length} mots sélectionnés · <button class="link" data-a="selNone">tout décocher</button>`}</p></div>`;
   }
@@ -221,14 +226,14 @@
         <div class="chips">${en.map(it => `<span class="chip">${ar(Engine.head(it), 'sm')}</span>`).join('')}</div></section>` : ''}
 
       <h2 class="sec">${esc(center().name)} · tes niveaux <button class="link" data-a="go" data-to="import">${ico('plus')}Ajouter des mots</button></h2>
-      ${decks.length ? `<div class="decks">${decks.map(d => {
+      ${decks.length ? `<div class="decks">${decks.filter(d => d.lessons.length).map(d => {
         const items = d.lessons.flatMap(l => l.items);
         const m = items.length ? items.reduce((a, it) => a + Engine.mastery(it), 0) / items.length : 0;
         return `<div class="dcard"><div class="dcard-h">${ar(d.title, 'md')}<span class="dpct">${Math.round(m * 100)} %</span></div>
           <small class="muted">${esc(d.subtitle || '')} · ${d.lessons.length} textes · ${items.length} mots</small>${bar(m)}
           <div class="row wrap"><button class="btn sm primary" data-a="reviseDeck" data-id="${esc(d.id)}">Réviser ce niveau</button><button class="btn sm ghost" data-a="go" data-to="words">Voir les mots</button></div></div>`;
       }).join('')}
-        <button class="dcard soon" data-a="go" data-to="import"><b>${ico('plus')} Ajouter un niveau ou un texte</b><small class="muted">Colle simplement ta liste de mots, une ligne par mot.</small></button></div>` : emptyCenter()}`;
+        <button class="dcard soon" data-a="go" data-to="import"><b>${ico('plus')} Ajouter un niveau ou un texte</b><small class="muted">Colle simplement ta liste de mots, une ligne par mot.</small></button></div>${soonRow(decks.filter(d => !d.lessons.length))}` : emptyCenter()}`;
   };
 
   /* ----- Réviser : réglages ----- */
@@ -1200,7 +1205,8 @@
     return `<div class="page-h"><h1>Mots</h1><p class="muted">Ajoute, corrige ou supprime les mots comme tu veux : ça ne change que ton compte, jamais celui des autres.</p></div>${centerSwitch()}
       ${adminBar()}
       <button class="addbig" data-a="goImport">${ico('plus')}<div><b>Ajouter des mots</b><small>Colle ta liste, une ligne par mot. Ou importe le paquet d'un ami avec son code.</small></div>${ico('chevron')}</button>
-      ${base.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')}</small></div><span class="lock">${ico('book')}Livre</span></div>${d.lessons.map(lrow).join('')}</section>`).join('')}
+      ${base.filter(d => d.lessons.length).map(d => { const open = OPEN.has(d.id); return `<section class="panel pdeck-w ${open ? 'open' : ''}"><button class="pdeck-tg wide" data-a="togDeck" data-id="${esc(d.id)}" aria-expanded="${open}">${ico('chevron', 'pchev')}<span class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')} · ${d.lessons.length} textes · ${d.lessons.reduce((a, l) => a + l.items.length, 0)} mots</small></span><span class="lock">${ico('book')}Livre</span></button>${open ? d.lessons.map(lrow).join('') : ''}</section>`; }).join('')}
+      ${base.filter(d => !d.lessons.length).map(d => `<section class="panel pdeck-w soon"><span class="pdeck-tg wide">${ico('lock', 'pchev')}<span class="pdeck-t">${ar(d.title, 'sm')}<small>${esc(d.subtitle || '')} · bientôt</small></span></span></section>`).join('')}
       <h2 class="sec">Mes paquets</h2>
       ${mine.length ? mine.map(d => `<section class="panel"><div class="row between"><div class="pdeck-t"><b class="dname">${esc(d.title)}</b><small>${d.lessons.length} texte${d.lessons.length > 1 ? 's' : ''}</small></div>
           <div class="row"><button class="btn sm ghost" data-a="renameDeck" data-id="${esc(d.id)}">Renommer</button><button class="btn sm ghost danger-t" data-a="delDeck" data-id="${esc(d.id)}">Supprimer</button></div></div>
@@ -1370,6 +1376,7 @@
       S().sel = S().sel.filter(id => !ids.includes(id)); if (!allOn) S().sel.push(...ids);
       Store.save(); FX.sound.tap(); render();
     },
+    togDeck: b => { const id = b.dataset.id; OPEN.has(id) ? OPEN.delete(id) : OPEN.add(id); FX.sound.tap(); render(); },
     selNone: () => { S().sel = []; Store.save(); render(); },
     quickReview: () => {
       const cards = Engine.cards(Engine.itemsFor(sel()), S().rev);

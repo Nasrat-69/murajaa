@@ -65,7 +65,7 @@
     ["Mots difficiles", "Hard words", "Трудные слова"], ["S'entraîner", "Practise", "Тренироваться"], ["Les mots que tu rates le plus souvent.", "The words you get wrong most often.", "Слова, в которых ты чаще всего ошибаешься."],
     ["Ajouter des mots", "Add words", "Добавить слова"], ["Ajouter un niveau ou une page", "Add a level or a page", "Добавить уровень или страницу"], ["Colle simplement ta liste de mots, une ligne par mot.", "Just paste your word list, one line per word.", "Просто вставь список слов, по одному слову на строку."],
     ["Réviser ce niveau", "Review this level", "Повторить уровень"], ["Voir les mots", "See the words", "Смотреть слова"],
-    ["Mustawa 1 à 7", "Mustawa 1 to 7", "Мустава 1–7"], ["Envoie les photos de ton livre pour les ajouter.", "Send photos of your book to add them.", "Пришли фото учебника, чтобы добавить их."],
+    ["Mustawa 1 à 8", "Mustawa 1 to 8", "Мустава 1–8"], ["Bientôt :", "Coming soon:", "Скоро:"], ["Niveau {n}", "Level {n}", "Уровень {n}"], ["{n} textes · {n} mots", "{n} texts · {n} words", "текстов: {n} · слов: {n}"], ["Envoie les photos de ton livre pour les ajouter.", "Send photos of your book to add them.", "Пришли фото учебника, чтобы добавить их."],
     // centres vides
     ["Rien de coché : tout le centre est inclus.", "Nothing ticked: the whole centre is included.", "Ничего не выбрано: включён весь центр."], ["tout décocher", "untick all", "снять все"], ["{n} mots sélectionnés", "{n} words selected", "выбрано слов: {n}"],
     ["Tout le niveau", "Whole level", "Весь уровень"],
