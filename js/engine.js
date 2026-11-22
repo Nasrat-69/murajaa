@@ -73,8 +73,10 @@ const Engine = (() => {
           arr.push(x); items[id] = x;
         };
         (l.items || []).forEach((it, i) => { if (d.user && !it.id) it.id = `${l.id}:${i}`; add(it, it.id || `${l.id}:${i}`, false, !!d.user); });
-        if (!d.user) (G.added[l.id] || []).forEach(it => { if (!G.hidden[it.id]) add(it, it.id, false, false, true); });
-        (S().custom[l.id] || []).forEach(it => add(it, it.id, true));
+        // l.alias : anciens identifiants de leçon (ex. pages du cahier devenues un texte) — on garde les mots ajoutés
+        const lids = [l.id, ...(l.alias || [])];
+        if (!d.user) lids.forEach(lid => (G.added[lid] || []).forEach(it => { if (!G.hidden[it.id]) add(it, it.id, false, false, true); }));
+        lids.forEach(lid => (S().custom[lid] || []).forEach(it => add(it, it.id, true)));
         const L = { id: l.id, title: l.title, titleAr: l.titleAr, deckId: d.id, items: arr };
         lessons[l.id] = L;
         return L;
