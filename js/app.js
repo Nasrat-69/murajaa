@@ -845,21 +845,39 @@
     if (!Cloud.st.user) return `<section class="panel empty">${ico('user', 'big')}<h3>Connecte-toi pour jouer en direct</h3><p class="muted">${msg}</p>${inappNotice()}<button class="btn google" data-a="signIn">${GOOGLE_G}Continuer avec Google</button></section>`;
     return '';
   }
+  const LIVE_MODES = [['qcm', 'choice', 'QCM', 'Choisis la bonne réponse parmi 4 propositions.'], ['type', 'pen', 'Écrire', 'Tape la réponse au clavier, la correction est automatique.']];
+  // cartes du duel : choisies par l'hôte (mêmes réglages que Réviser), puis envoyées par identifiant à l'adversaire
+  function liveCardList(st) {
+    const items = Engine.itemsFor(st.l).filter(it => !it.custom && !(LIB.decks.find(d => d.id === it.deckId) || {}).user);
+    let list = Engine.selectCards(Engine.cards(items, { what: st.what, dir: st.dir }), st.which || 'all');
+    if ((st.which || 'all') !== 'due' && st.order !== 'book') list = Engine.shuffle(list);
+    return list.slice(0, st.n === 'all' ? 60 : st.n).map(c => c.id);
+  }
   function liveHome() {
     const gate = needAccount('Chaque joueur se connecte avec son compte Google, puis l\'un crée une salle et l\'autre la rejoint avec le code.');
     if (gate) return gate;
     const l = S().live;
-    const nItems = Engine.itemsFor(sel()).length;
-    return `<section class="panel"><h2>Créer une salle</h2>
-        <p class="muted small">Contenu : <b>${esc(center().name)}</b> · ${nItems} mots selon ta sélection — <button class="link" data-a="go" data-to="reviewSetup">changer</button></p>
-        <h3>Questions</h3>${seg('liveOpt', 'n', [[5, '5'], [10, '10'], [15, '15'], [20, '20']], l.n)}
-        <h3>Réponses</h3>${seg('liveOpt', 'mode', [['qcm', 'Choix multiples'], ['type', 'Écrire']], l.mode)}
+    const cards = Engine.cards(Engine.itemsFor(sel()), l), cnt = Engine.countWhich(cards), avail = cnt[l.which] || 0;
+    const n = l.n === 'all' ? Math.min(avail, 60) : Math.min(avail, l.n);
+    return `<section class="panel"><h2>Rejoindre une salle</h2>
+        <div class="row"><input id="liveCode" class="codein" placeholder="CODE" maxlength="5" value="${esc(V.joinCode || '')}" autocapitalize="characters"><button class="btn primary" data-a="liveJoin">Rejoindre</button></div></section>
+      <h2 class="sec">Créer une salle</h2>
+      <section class="panel"><h2 class="step"><i>1</i>Quels textes ?</h2>${picker()}</section>
+      <section class="panel"><h2 class="step"><i>2</i>Type de question</h2>${whatChips(l.what, 'liveWhat')}
+        <h3>Sens</h3>${seg('liveOpt', 'dir', [['ar', 'Arabe → Français'], ['fr', 'Français → Arabe'], ['both', 'Les deux']], l.dir)}</section>
+      <section class="panel"><h2 class="step"><i>3</i>Quelles cartes ?</h2>
+        <div class="which">${WHICH.map(([k, t, d]) => `<button class="whc ${l.which === k ? 'on' : ''} ${cnt[k] ? '' : 'empty'}" data-a="liveOpt" data-k="which" data-v="${k}"><b>${t}</b><span class="whn">${cnt[k]}</span><small>${d}</small></button>`).join('')}</div>
+        <p class="muted small">Ce sont tes cartes (ta progression) qui servent à choisir les questions ; ton binôme reçoit exactement les mêmes.</p>
+        <h3>Ordre des mots</h3>${seg('liveOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], l.order)}
+        <h3>Nombre de questions</h3>${seg('liveOpt', 'n', [[5, '5'], [10, '10'], [15, '15'], [20, '20'], ['all', 'Toutes']], l.n)}</section>
+      <section class="panel"><h2 class="step"><i>4</i>Comment ?</h2>
+        <div class="modes">${LIVE_MODES.map(([k, i, t, d]) => `<button class="mode ${l.mode === k ? 'on' : ''}" data-a="liveOpt" data-k="mode" data-v="${k}"><span class="mi">${ico(i)}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div></section>
+      <section class="panel"><h2 class="step"><i>5</i>Règles du duel</h2>
         <h3>Temps par question</h3>${seg('liveOpt', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], l.time)}
         <h3>Après chaque question</h3>${seg('liveOpt', 'adv', [['auto', 'On passe tout seul'], ['manual', 'Bouton « Suivant »']], l.adv)}
-        <p class="muted small">Avec « Suivant », vous voyez la correction et vous pouvez en discuter avant de continuer. Le chrono peut aussi être mis en pause à tout moment.</p>
-        <button class="btn primary lg wide" data-a="liveCreate" ${nItems ? '' : 'disabled'}>Créer la salle</button></section>
-      <section class="panel"><h2>Rejoindre une salle</h2>
-        <div class="row"><input id="liveCode" class="codein" placeholder="CODE" maxlength="5" value="${esc(V.joinCode || '')}" autocapitalize="characters"><button class="btn primary" data-a="liveJoin">Rejoindre</button></div></section>`;
+        <p class="muted small">Avec « Suivant », vous voyez la correction et vous pouvez en discuter avant de continuer. Le chrono peut aussi être mis en pause à tout moment.</p></section>
+      <div class="cta-bar"><div class="cta-info"><b>${n}</b> question${n > 1 ? 's' : ''}<small>${esc(WHICH.find(w => w[0] === l.which)[1])} · ${cards.length} au total</small></div>
+        <button class="btn primary lg" data-a="liveCreate" ${n ? '' : 'disabled'}>Créer la salle</button></div>`;
   }
 
   /* ----- Duel en direct ----- */
@@ -872,6 +890,11 @@
     render();
   }
   function liveQs(st) {
+    if (st.cards) {
+      const map = {}; Engine.cards(Engine.itemsFor(st.l), { what: st.what, dir: st.dir }).forEach(c => { map[c.id] = c; });
+      V.missing = st.cards.filter(id => !map[id]).length;
+      return Engine.qsFromCards(st.cards.map(id => map[id]).filter(Boolean), Engine.rng32(st.seed));
+    }
     const items = Engine.itemsFor(st.l).slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     return Engine.makeExam(items, { n: st.n, rng: Engine.rng32(st.seed) });
   }
@@ -888,7 +911,9 @@
     const st = data.settings;
     if (data.state !== 'lobby' && (!V.qs || V.seed !== st.seed)) { V.qs = liveQs(st); V.seed = st.seed; }
     if (data.state === 'playing') {
-      if (V.qi !== data.qi) { V.qi = data.qi; V.t0 = Date.now(); V.pick = {}; V.cur = null; V.sent = false; V.paused = null; }
+      if (V.qi !== data.qi) { V.qi = data.qi; V.t0 = Date.now(); V.pick = {}; V.cur = null; V.sent = false; V.paused = null; V.oppSeen = null; }
+      const op = opp();
+      if (op && op.ans && op.ans[data.qi] && V.oppSeen !== data.qi) { V.oppSeen = data.qi; if (!V.sent) { FX.sound.tap(); FX.buzz(30); } }
       // pause : le chrono est figé pour les deux joueurs
       const pz = data.paused && data.paused.qi === data.qi ? data.paused : null;
       if (pz) V.paused = pz;
@@ -932,7 +957,9 @@
     const m = mine(), o = opp();
     const ms = m ? m.score : 0, os = o ? o.score : 0;
     const lead = ms === os ? 'Égalité' : ms > os ? `Tu mènes de ${ms - os}` : `${esc(o.name)} mène de ${os - ms}`;
-    const pl = (p, you) => p ? `<div class="sp ${you ? 'you' : ''} ${(you ? ms > os : os > ms) ? 'lead' : ''}">${avatar(p)}<div><b>${esc(p.name)}${you ? ' (toi)' : ''}</b><span>${p.score} pts</span></div>${(you ? ms > os : os > ms) ? `<i class="crown">${ico('crown')}</i>` : ''}</div>` : `<div class="sp wait">${avatar({ name: '?' })}<div><b>En attente…</b><span>—</span></div></div>`;
+    const play = r.state === 'playing' && V.qi != null;
+    const stat = p => !play || !p ? '' : (p.ans && p.ans[V.qi] ? `<em class="pst ok">${ico('check')}a validé</em>` : `<em class="pst">réfléchit <span class="dots"><i></i><i></i><i></i></span></em>`);
+    const pl = (p, you) => p ? `<div class="sp ${you ? 'you' : ''} ${(you ? ms > os : os > ms) ? 'lead' : ''} ${play && p.ans && p.ans[V.qi] ? 'answered' : ''}">${avatar(p)}<div><b>${esc(p.name)}${you ? ' (toi)' : ''}</b><span>${p.score} pts</span>${stat(p)}</div>${(you ? ms > os : os > ms) ? `<i class="crown">${ico('crown')}</i>` : ''}</div>` : `<div class="sp wait">${avatar({ name: '?' })}<div><b>En attente…</b><span>—</span></div></div>`;
     return `<div class="scoreboard">${pl(Object.assign({}, m, { name: (m && m.name) || 'Moi' }), true)}<div class="vs-mid"><small>${r.state === 'playing' ? lead : 'VS'}</small></div>${pl(o, false)}</div>`;
   }
   VIEWS.live = () => {
@@ -954,13 +981,13 @@
           <p class="muted small">${ico('headset')} Rejoignez le salon vocal en bas de l'écran pour vous parler pendant la partie.</p></section>
         ${scoreboard(r)}
         <section class="panel"><h3>Réglages de la partie</h3>
-          <p class="small">${words} mots · ${st.n} questions · ${st.mode === 'qcm' ? 'choix multiples' : 'à écrire'} · ${st.time} s par question · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
+          <p class="small">${words} mots · ${st.n === 'all' ? 'toutes les' : st.n} questions${st.what ? ' · ' + Object.keys(CATS).filter(k => st.what[k]).map(k => CATS[k].label).join(', ') : ''} · ${st.mode === 'qcm' ? 'choix multiples' : 'à écrire'} · ${st.time} s par question · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
           ${missing.length ? `<p class="warn">Il te manque des leçons de cette partie (mets l'appli à jour).</p>` : ''}
-          ${isHost() ? `<h3>Questions</h3>${seg('liveSet', 'n', [[5, '5'], [10, '10'], [15, '15'], [20, '20']], st.n)}
+          ${isHost() ? `<h3>Questions</h3>${seg('liveSet', 'n', [[5, '5'], [10, '10'], [15, '15'], [20, '20'], ['all', 'Toutes']], st.n)}
             <h3>Réponses</h3>${seg('liveSet', 'mode', [['qcm', 'Choix multiples'], ['type', 'Écrire']], st.mode)}
             <h3>Temps</h3>${seg('liveSet', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], st.time)}
             <h3>Après chaque question</h3>${seg('liveSet', 'adv', [['auto', 'Automatique'], ['manual', 'Bouton « Suivant »']], st.adv || 'auto')}
-            <button class="link" data-a="liveUseSel">Utiliser ma sélection actuelle (${Engine.itemsFor(sel()).length} mots)</button>` : ''}</section>
+            <button class="link" data-a="liveUseSel">Utiliser mes réglages actuels de Duel (${Engine.itemsFor(sel()).length} mots)</button>` : ''}</section>
         ${isHost() ? `<button class="btn primary lg wide" data-a="liveStart" ${o ? '' : 'disabled'}>${o ? 'Lancer la partie' : 'En attente de ton binôme…'}</button>`
           : `<div class="waiting"><span class="dots"><i></i><i></i><i></i></span>En attente du lancement par l'hôte</div>`}`;
     }
@@ -974,7 +1001,7 @@
       const card = questionCard(q, st.mode, V.pick, V.cur, st.h || 'none');
       if (!V.sent) return `${quit}${head}${pauseBox}<div class="${V.paused ? 'frozen' : ''}">${card}</div>
         ${st.mode === 'type' ? `<button class="link osk-toggle" data-a="toggleOsk">${ico('keyboard')} Clavier arabe : ${S().settings.osk ? 'activé' : 'désactivé'}</button>` : ''}
-        <div class="oppstat">${o ? (oA ? `${avatar(o)} <b>${esc(o.name)}</b> a répondu` : `${avatar(o)} <b>${esc(o.name)}</b> réfléchit <span class="dots"><i></i><i></i><i></i></span>`) : ''}</div>
+        <div class="oppstat ${oA ? 'ok' : ''}">${o ? (oA ? `${avatar(o)}<span><b>${esc(o.name)}</b> a validé sa réponse</span>${ico('check')}` : `${avatar(o)}<span><b>${esc(o.name)}</b> réfléchit</span><span class="dots"><i></i><i></i><i></i></span>`) : ''}</div>
         <button class="btn primary lg wide" data-a="liveSubmit" ${V.paused ? 'disabled' : ''}>Valider <kbd>Entrée</kbd></button>`;
       const res = (p, a) => a ? `<div class="rr ${a.ok ? 'ok' : 'ko'}">${avatar(p)}<b>${esc(p.name)}</b><span>${a.to ? 'temps écoulé' : (a.ok ? 'juste' : `${a.n}/${q.hidden.length}`)} · ${(a.ms / 1000).toFixed(1)} s</span><em>+${a.pts}</em></div>` : '';
       const manual = st.adv === 'manual' || stale;
@@ -1465,11 +1492,12 @@
     signOut: async () => { if (!confirm('Se déconnecter ? Ta progression reste aussi sur cet appareil.')) return; await Cloud.signOut(); toast('Déconnecté'); render(); },
     syncNow: async () => { await Cloud.pull(); rebuild(); render(); toast('Synchronisé'); },
     // duel en direct
+    liveWhat: b => { const w = S().live.what; w[b.dataset.k] = !w[b.dataset.k]; Store.save(); FX.sound.tap(); render(); },
     liveOpt: b => { S().live[b.dataset.k] = parseV(b.dataset.v); if (b.dataset.k === 'mode') S().live.time = S().live.mode === 'type' ? 60 : 30; Store.save(); render(); },
     liveCreate: async b => {
       b.disabled = true;
       const l = S().live;
-      const settings = { l: sel(), n: l.n, mode: l.mode, time: l.time, adv: l.adv, h: S().settings.harakat, seed: Math.floor(Math.random() * 2 ** 31) };
+      const settings = { l: sel(), n: l.n, mode: l.mode, time: l.time, adv: l.adv, what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order, h: S().settings.harakat, seed: Math.floor(Math.random() * 2 ** 31) };
       try { const c = await Cloud.createRoom(settings); openLive(c); } catch (e) { b.disabled = false; toast('Erreur : ' + e.message, 4000); }
     },
     liveJoin: async b => {
@@ -1479,10 +1507,14 @@
       try { await Cloud.joinRoom(c); openLive(c); } catch (e) { b.disabled = false; toast(e.message, 4000); }
     },
     liveSet: b => { const st = Object.assign({}, V.room.settings, { [b.dataset.k]: parseV(b.dataset.v) }); if (b.dataset.k === 'mode') st.time = st.mode === 'type' ? 60 : 30; Cloud.updateSettings(V.code, st); },
-    liveUseSel: () => Cloud.updateSettings(V.code, Object.assign({}, V.room.settings, { l: sel() })),
-    liveStart: () => { const st = Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) }); Cloud.updateSettings(V.code, st).then(() => Cloud.startRoom(V.code)); },
+    liveUseSel: () => { const l = S().live; Cloud.updateSettings(V.code, Object.assign({}, V.room.settings, { l: sel(), what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order })); },
+    liveStart: () => {
+      const st = Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) });
+      if (st.what) { st.cards = liveCardList(st); if (!st.cards.length) { toast('Aucune carte avec ces réglages. Choisis « Tous les mots » ou d\'autres textes.', 4000); return; } }
+      Cloud.updateSettings(V.code, st).then(() => Cloud.startRoom(V.code));
+    },
     liveSubmit: () => submitLive(false),
-    liveRematch: () => Cloud.rematch(V.code, Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) })),
+    liveRematch: () => { const st = Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) }); if (st.what) st.cards = liveCardList(st); Cloud.rematch(V.code, st); },
     liveQuit: () => { if (V.room && V.room.state === 'playing' && !confirm('Quitter la partie en cours ?')) return; history.replaceState(null, '', location.pathname); go('duel', { tab: 'live' }); },
     livePause: () => { if (!V.room || V.paused) return; Cloud.pause(V.code, V.qi, liveLim() - (Date.now() - V.t0)).catch(e => toast(e.message)); },
     liveResume: () => Cloud.resume(V.code).catch(e => toast(e.message)),

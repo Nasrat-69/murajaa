@@ -711,3 +711,12 @@ body.call-on .main.session { padding-bottom: 200px; }
 .soonchip small { color: var(--muted); font-size: .7rem; }
 .pdeck.soon, .pdeck-w.soon { opacity: .55; border-style: dashed; }
 .pdeck-w.soon { padding-block: 10px; }
+
+/* duel : statut des joueurs */
+.sp .pst { display: flex; align-items: center; gap: 4px; font-style: normal; font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.sp .pst.ok { color: var(--good); font-weight: 700; }
+.sp .pst svg { width: 13px; height: 13px; }
+.sp.answered { box-shadow: 0 0 0 2px color-mix(in srgb, var(--good) 55%, transparent); }
+.oppstat { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 12px; border-radius: 12px; transition: background .2s; }
+.oppstat.ok { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); animation: pop .35s ease; }
+.oppstat.ok svg { width: 18px; height: 18px; }
