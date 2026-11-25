@@ -24,6 +24,8 @@ const Cloud = (() => {
     try {
       firebase.initializeApp(window.FIREBASE_CONFIG);
       auth = firebase.auth(); db = firebase.firestore();
+      // certains réseaux mobiles bloquent le flux temps réel : Firestore bascule alors en « long polling »
+      try { db.settings({ experimentalAutoDetectLongPolling: true, merge: true }); } catch (e) { /* déjà initialisé */ }
       st.enabled = true; st.status = 'loading';
       auth.onAuthStateChanged(async u => {
         st.user = u; st.ready = true;
@@ -132,6 +134,10 @@ const Cloud = (() => {
   }
   const watchRoom = (c, cb) => room(c).onSnapshot(s => cb(s.exists ? s.data() : null), e => { console.warn(e); cb(null, e); });
   const updateSettings = (c, settings) => room(c).update({ settings });
+  // lecture directe sur le serveur : filet de sécurité si l'écoute en temps réel se fige
+  const fetchRoom = c => room(c).get({ source: 'server' }).then(s => (s.exists ? s.data() : null));
+  // mode oral : celui qui interroge note la réponse de l'autre
+  const judge = (c, qi, target, a) => room(c).update({ ['players.' + target + '.ans.' + qi]: a, ['players.' + target + '.score']: FV().increment(a.pts || 0) });
   const startRoom = c => room(c).update({ state: 'playing', qi: 0, qAt: Date.now() });
   const advance = (c, qi, n) => room(c).update(qi >= n ? { state: 'done', qi } : { qi, qAt: Date.now() });
   const answer = (c, qi, a) => room(c).update({ ['players.' + uid() + '.ans.' + qi]: a, ['players.' + uid() + '.score']: FV().increment(a.pts || 0) });
@@ -177,7 +183,7 @@ const Cloud = (() => {
 
   return {
     st, init, signIn, signOut, pull, pushNow, profiles, uid,
-    createRoom, joinRoom, watchRoom, updateSettings, startRoom, advance, answer, leaveRoom, rematch,
+    createRoom, joinRoom, watchRoom, fetchRoom, judge, updateSettings, startRoom, advance, answer, leaveRoom, rematch,
     advanceFrom, pause, resume, setCall, rtc, arrayUnion, share, getShared, isAdmin, saveBase, get base() { return base; },
     on: f => { subs.add(f); return () => subs.delete(f); }
   };

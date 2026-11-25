@@ -404,7 +404,7 @@ details { border-bottom: 1px solid var(--line); padding: 6px 0; } summary { curs
 .reveal { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; animation: slideUp .25s; }
 .rr { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; padding: 8px 12px; }
 .rr.ok { border-color: var(--good); } .rr.ko { border-color: var(--bad); }
-.rr span { color: var(--muted); font-size: .86rem; flex: 1; } .rr em { font-style: normal; font-weight: 800; color: var(--primary); }
+.rr span:not(.av) { color: var(--muted); font-size: .86rem; flex: 1; } .rr em { font-style: normal; font-weight: 800; color: var(--primary); }
 .h2h { font-size: .92rem; } .h2h .w { color: var(--good); } .h2h .l { color: var(--bad); } .h2h .d { color: var(--draw); }
 .rival .row > div { display: flex; flex-direction: column; }
 .wld { display: inline-flex; gap: 4px; font-weight: 800; font-size: .9rem; }
@@ -720,3 +720,18 @@ body.call-on .main.session { padding-bottom: 200px; }
 .oppstat { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 12px; border-radius: 12px; transition: background .2s; }
 .oppstat.ok { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); animation: pop .35s ease; }
 .oppstat.ok svg { width: 18px; height: 18px; }
+
+/* duel : réponse de chacun, mode oral */
+.rr-w { display: flex; flex-direction: column; gap: 4px; }
+.rr-ans { display: flex; flex-wrap: wrap; gap: 6px; padding-inline-start: 42px; }
+.rr-ans .ra { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 3px 8px; background: var(--bad-soft); }
+.rr-ans .ra.ok { background: var(--good-soft); }
+.rr-ans .ra small { color: var(--muted); font-size: .7rem; }
+.livebar .role { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; padding: 3px 10px; border-radius: 99px; background: var(--primary-soft); color: var(--primary); font-weight: 600; }
+.livebar .role svg { width: 15px; height: 15px; }
+.livebar .role.ans { background: var(--gold-soft); color: var(--text); }
+.oral-mask { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border: 1.5px dashed var(--line); border-radius: 12px; color: var(--muted); }
+.oral-mask svg { width: 16px; height: 16px; }
+.oral-ans { display: flex; justify-content: center; padding: 6px; border-radius: 12px; background: var(--good-soft); animation: pop .3s ease; }
+.judge { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.judge .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }

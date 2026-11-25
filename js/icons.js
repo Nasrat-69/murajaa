@@ -31,6 +31,7 @@ const ICONS = {
   equal: '<path d="M5 9h14M5 15h14"/>',
   plural: '<rect x="3" y="8" width="11" height="11" rx="2"/><path d="M8 4h10a2 2 0 0 1 2 2v10"/>',
   trophy: '<path d="M8 21h8M12 17v4"/><path d="M7 3h10v6a5 5 0 0 1-10 0Z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>',
+  eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   logout: '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M9 8l-4 4 4 4M5 12h11"/>',

@@ -132,6 +132,8 @@ const Store = (() => {
     return d < 30 ? Math.round(d) + ' j' : d < 365 ? Math.round(d / 30) + ' mois' : (d / 365).toFixed(1) + ' an';
   }
   // résultat d'examen / jeu : statistiques + une erreur ramène le mot en révision
+  // « À revoir » / « Difficile » : le mot va dans la liste des mots difficiles
+  function markHard(itemId) { const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 }); r.err++; save(); }
   function answer(itemId, ok) {
     const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 });
     const d = dayRec(); d.n++;
@@ -146,6 +148,6 @@ const Store = (() => {
   load();
   return {
     get S() { return S; }, set S(v) { S = v; }, set onSave(f) { onSave = f; },
-    save, saveNow, load, defaults, normalize, merge, replace, today, addXP, streak, bestStreak, level, newToday, grade, preview, answer, KEY
+    save, saveNow, load, defaults, normalize, merge, replace, today, addXP, streak, bestStreak, level, newToday, grade, preview, answer, markHard, KEY
   };
 })();

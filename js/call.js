@@ -1,7 +1,12 @@
 /* Salon vocal / vidéo intégré au duel en direct (WebRTC pair-à-pair, signalisation via Firestore).
    L'hôte de la salle lance l'appel dès que les deux joueurs l'ont rejoint. */
 const Call = (() => {
-  const ICE = { iceServers: [{ urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
+  // STUN : trouve l'adresse publique. TURN (relais) : indispensable quand l'un des deux est en 4G/5G ou derrière un réseau strict.
+  // window.TURN_SERVERS (dans js/config.js) permet de mettre ses propres relais.
+  const ICE = { iceServers: [
+    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+    ...(window.TURN_SERVERS || [{ urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' }])
+  ] };
   const el = document.getElementById('call');
   const st = {
     code: null, room: null, joined: false, mic: true, cam: false, local: null, camTrack: null, pc: null, sid: null,
@@ -42,11 +47,18 @@ const Call = (() => {
     pc.onicecandidate = e => { if (e.candidate) sendCand(JSON.stringify(e.candidate.toJSON())); };
     pc.ontrack = e => {
       if (!st.remote) st.remote = new MediaStream();
+      // un seul flux par type : on remplace l'ancienne piste (après une relance)
+      st.remote.getTracks().filter(t => t.kind === e.track.kind && t !== e.track).forEach(t => st.remote.removeTrack(t));
       if (!st.remote.getTracks().includes(e.track)) st.remote.addTrack(e.track);
       e.track.onunmute = () => render(); e.track.onmute = () => render();
       bindMedia(); meter('them', st.remote); render();
     };
-    pc.onconnectionstatechange = () => { st.status = pc.connectionState; render(); };
+    pc.onconnectionstatechange = () => {
+      st.status = pc.connectionState; render();
+      if (pc.connectionState === 'connected') st.retries = 0;
+      // échec : l'hôte relance l'appel (2 fois maximum)
+      if (pc.connectionState === 'failed' && isHost() && (st.retries || 0) < 2) { st.retries = (st.retries || 0) + 1; setTimeout(() => { if (st.pc === pc) makeOffer().catch(warn); }, 1500); }
+    };
     return pc;
   }
   function sendCand(s) {
@@ -55,7 +67,8 @@ const Call = (() => {
   }
   function closePc() {
     if (st.pc) { try { st.pc.close(); } catch (e) { /* déjà fermé */ } }
-    st.pc = null; st.sid = null; st.remote = null; st.videoSender = null; st.seen.clear(); st.pending = []; st.outbox = []; st.docReady = false;
+    if (st.remote) st.remote.getTracks().forEach(t => st.remote.removeTrack(t));
+    st.pc = null; st.sid = null; st.videoSender = null; st.seen.clear(); st.pending = []; st.outbox = []; st.docReady = false;
     stopMeter('them'); st.status = st.joined ? 'waiting' : 'idle';
   }
   async function makeOffer() {
@@ -102,9 +115,15 @@ const Call = (() => {
     try { st.local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }); }
     catch (e) { st.joining = false; st.err = 'Micro refusé : autorise le micro dans ton navigateur.'; render(); return; }
     st.joined = true; st.joining = false; st.mic = true; st.status = 'waiting';
+    unlockAudio();
     meter('me', st.local);
     await Cloud.setCall(st.code, { mic: true, cam: false }).catch(warn);
     sync();
+  }
+  function unlockAudio() {
+    try { st.ac = st.ac || new (window.AudioContext || window.webkitAudioContext)(); if (st.ac.state === 'suspended') st.ac.resume(); } catch (e) { /* rien */ }
+    const a = document.getElementById('ca-them');
+    if (a) { if (!st.remote) st.remote = new MediaStream(); a.srcObject = st.remote; a.muted = false; a.play().then(() => { st.blocked = false; }).catch(() => { st.blocked = true; render(); }); }
   }
   function leave(silent) {
     closePc();
@@ -163,7 +182,8 @@ const Call = (() => {
 
   /* ---- interface façon Discord ---- */
   function bindMedia() {
-    const a = document.getElementById('ca-them'); if (a && st.remote && a.srcObject !== st.remote) { a.srcObject = st.remote; a.play().catch(() => {}); }
+    const a = document.getElementById('ca-them');
+    if (a && st.remote) { if (a.srcObject !== st.remote) a.srcObject = st.remote; if (a.paused) a.play().then(() => { if (st.blocked) { st.blocked = false; render(); } }).catch(() => { if (!st.blocked) { st.blocked = true; render(); } }); }
     const vt = document.getElementById('cv-them'); if (vt && st.remote && vt.srcObject !== st.remote) { vt.srcObject = st.remote; vt.play().catch(() => {}); }
     const vm = document.getElementById('cv-me');
     if (vm) { const want = st.camTrack ? new MediaStream([st.camTrack]) : null; if (!want) vm.srcObject = null; else if (!vm.srcObject || vm.srcObject.getVideoTracks()[0] !== st.camTrack) { vm.srcObject = want; vm.play().catch(() => {}); } }
@@ -178,7 +198,7 @@ const Call = (() => {
     if (!st.joined) return members()[o] ? `${esc(p.name)} est dans le salon` : 'Personne dans le salon';
     if (!o) return 'En attente de ton binôme';
     if (!members()[o]) return `En attente de ${esc(p.name)}…`;
-    return { connecting: 'Connexion…', new: 'Connexion…', connected: 'Connecté', disconnected: 'Connexion instable…', failed: 'Échec : réseau trop restrictif', waiting: 'Connexion…' }[st.status] || 'Connexion…';
+    return { connecting: 'Connexion…', new: 'Connexion…', connected: 'Connecté', disconnected: 'Connexion instable…', failed: 'Échec de connexion, nouvel essai…', waiting: 'Connexion…' }[st.status] || 'Connexion…';
   }
   function render() {
     if (!st.code || !st.room) return;
@@ -202,6 +222,7 @@ const Call = (() => {
         const c = b.dataset.c;
         if (c === 'join') join(); else if (c === 'leave') leave(); else if (c === 'mic') toggleMic(); else if (c === 'cam') toggleCam();
         else if (c === 'min') { st.min = !st.min; render(); }
+        else if (c === 'unmute') unlockAudio();
       });
     }
     el.className = 'call' + (st.min ? ' min' : '') + (st.joined ? ' joined' : '');
@@ -216,7 +237,7 @@ const Call = (() => {
     setTile('me', me, st.joined, st.mic, st.cam);
     setTile('them', op, !!om, om ? om.mic : true, remoteCam);
     el.querySelector('#call-ctl').innerHTML = st.joined
-      ? `<button class="cbtn ${st.mic ? '' : 'off'}" data-c="mic" aria-label="Micro">${ico(st.mic ? 'mic' : 'micoff')}</button>
+      ? `${st.blocked ? `<button class="cbtn join" data-c="unmute">${ico('sound')}Activer le son</button>` : ''}<button class="cbtn ${st.mic ? '' : 'off'}" data-c="mic" aria-label="Micro">${ico(st.mic ? 'mic' : 'micoff')}</button>
          <button class="cbtn ${st.cam ? 'on' : ''}" data-c="cam" aria-label="Caméra">${ico(st.cam ? 'video' : 'camoff')}</button>
          <button class="cbtn red" data-c="leave" aria-label="Quitter l'appel">${ico('phone')}</button>`
       : `<button class="cbtn join" data-c="join" ${st.joining ? 'disabled' : ''}>${ico('headset')}${st.joining ? 'Connexion…' : 'Rejoindre le salon vocal'}</button>`;

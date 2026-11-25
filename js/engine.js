@@ -19,8 +19,8 @@ const Engine = (() => {
   };
   const TYPES = {
     verb: { label: 'Verbe', ar: 'فِعْل', exam: ['madi', 'mud', 'amr', 'masdar', 'fr'], edit: ['madi', 'mud', 'amr', 'masdar', 'prep', 'fr', 'ex', 'note'] },
-    noun: { label: 'Nom', ar: 'اِسْم', exam: ['w', 'pl', 'ant', 'fr'], edit: ['w', 'pl', 'syn', 'ant', 'fr', 'ex', 'note'] },
-    adj: { label: 'Adjectif', ar: 'صِفَة', exam: ['w', 'fem', 'pl', 'ant', 'fr'], edit: ['w', 'fem', 'pl', 'syn', 'ant', 'fr', 'ex', 'note'] },
+    noun: { label: 'Nom', ar: 'اِسْم', exam: ['w', 'ant', 'pl', 'syn', 'fr'], edit: ['w', 'pl', 'syn', 'ant', 'fr', 'ex', 'note'] },
+    adj: { label: 'Adjectif', ar: 'صِفَة', exam: ['w', 'fem', 'ant', 'pl', 'syn', 'fr'], edit: ['w', 'fem', 'pl', 'syn', 'ant', 'fr', 'ex', 'note'] },
     expr: { label: 'Expression', ar: 'عِبَارَة', exam: ['w', 'fr'], edit: ['w', 'fr', 'ex', 'note'] }
   };
   // catégories de questions (révision + jeux)
@@ -155,11 +155,23 @@ const Engine = (() => {
     if (what.prep) k.push('prep0', 'prep1', 'prep2', 'prep3');
     return k;
   }
-  function cards(items, prefs) {
-    const ks = kindsWanted(prefs), out = [];
-    for (const it of items) for (const k of ks) {
-      const s = spec(k, it);
-      if (s) out.push({ id: it.id + '|' + k, kind: k, item: s.item || it, p: s.p, a: s.a });
+  // une seule carte par mot : type de question tiré au hasard parmi ceux cochés (et un seul sens)
+  // prefs.all = toutes les cartes possibles (pour retrouver les cartes d'un duel par leur identifiant)
+  function cards(items, prefs = {}) {
+    const ks = kindsWanted(prefs), out = [], rnd = prefs.rng || Math.random, now = Date.now();
+    const pick = a => a[Math.floor(rnd() * a.length)];
+    for (const it of items) {
+      const cs = [];
+      for (const k of ks) { const s = spec(k, it); if (s) cs.push({ id: it.id + '|' + k, kind: k, item: s.item || it, p: s.p, a: s.a }); }
+      if (prefs.all) { out.push(...cs); continue; }
+      if (!cs.length) continue;
+      // priorité aux cartes à revoir aujourd'hui, puis aux jamais vues, pour garder la répétition espacée
+      const st = c => S().cards[c.id];
+      let cand = cs.filter(c => st(c) && st(c).due <= now);
+      if (!cand.length && cs.some(c => st(c))) cand = cs.filter(c => !st(c));
+      if (!cand.length) cand = cs;
+      const cats = [...new Set(cand.map(c => KINDS[c.kind].cat))], cat = pick(cats);
+      out.push(pick(cand.filter(c => KINDS[c.kind].cat === cat)));
     }
     return out;
   }
@@ -295,8 +307,29 @@ const Engine = (() => {
     const right = AR.canon(w);
     return [...out].filter(x => AR.canon(x) !== right && !/^أِ/.test(x));   // « أِ » n'existe pas (on écrit إِ)
   }
+  // صَلَاةٌ → صَلَااتٌ, صَلَيَاتٌ… : des pluriels qui ressemblent, au lieu de mots sans rapport
+  function pluralTraps(it) {
+    const right = AR.alts(it.pl).map(x => AR.canon(x)), seen = new Set(right), out = [];
+    const add = x => { if (!x) return; const c = AR.canon(x); if (seen.has(c) || /^أِ/.test(x) || /اا.*اا/.test(x)) return; seen.add(c); out.push(x); };
+    const sg = (AR.alts(it.w)[0] || '').replace(/^ال/, ''), pl = AR.alts(it.pl)[0] || '';
+    let s = sg.replace(/[ًٌٍ]+$/, '').replace(/[َُِْ]$/, '');
+    if (s.endsWith('ة')) { const b = s.slice(0, -1); add((/ا$/.test(b) ? b : b.replace(/[َُِْ]$/, '') + FA) + 'اتٌ'); }
+    else if (s.length > 1) { add(s + FA + 'اتٌ'); if (it.t === 'adj' || /ِي$|َان$/.test(s)) add(s + DA + 'ونَ'); }
+    // lettres faibles échangées dans le vrai pluriel : صَلَوَاتٌ → صَلَيَاتٌ
+    const cs = [...pl];
+    cs.forEach((ch, i) => { if (i > 1 && 'وي'.includes(ch)) add(cs.map((x, j) => (j === i ? (ch === 'و' ? 'ي' : 'و') : x)).join('')); });
+    vowelTraps(pl, 'pl').forEach(add);
+    // schéma de pluriel brisé changé : أَفْعَالٌ ↔ فُعُولٌ ↔ فِعَالٌ (si le singulier a 3 lettres)
+    const L = [...AR.strip(sg).replace(/ة$/, '')];
+    if (L.length === 3 && !/[اوي]/.test(L[1] + L[2])) {
+      const [a, b, c] = L;
+      ['أَ' + a + SK + b + FA + 'ا' + c + DA, a + DA + b + DA + 'و' + c + DA, a + KA + b + FA + 'ا' + c + DA, 'أَ' + a + SK + b + DA + c + DA].forEach(x => add(x.replace(/ُ$/, 'ٌ')));
+    }
+    return out;
+  }
   function options(it, f, pool, rng = Math.random, k = 4) {
     let opts = [];
+    if (f === 'pl' && it.w && it.pl) opts = shuffle(pluralTraps(it), rng).slice(0, k - 1);
     // verbe : d'abord des pièges construits sur la même racine
     if (it.t === 'verb' && ['madi', 'mud', 'amr', 'masdar'].includes(f)) {
       let tr = rootTraps(it, f);
@@ -312,14 +345,14 @@ const Engine = (() => {
   }
 
   function makeExam(items, { n = 15, rng = Math.random } = {}) {
-    const usable = items.filter(it => examFields(it).length >= 2);
+    const usable = items.filter(it => it[headF(it)] && examFields(it).length >= 2);
     if (!usable.length) return [];
     const order = shuffle(usable.slice(), rng);
     const count = n === 'all' ? usable.length : Math.min(+n, usable.length);
     const qs = [];
     for (let i = 0; i < count; i++) {
       const it = order[i], fs = examFields(it);
-      const given = fs[Math.floor(rng() * fs.length)];
+      const given = headF(it);
       const hidden = fs.filter(f => f !== given);
       const opts = {}; hidden.forEach(f => { opts[f] = options(it, f, usable, rng); });
       qs.push({ item: it, given, hidden, options: opts });
