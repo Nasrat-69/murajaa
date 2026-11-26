@@ -859,16 +859,9 @@
     if (st.mode === 'speed' && list.length > 1 && list.length % 2) list = list.slice(0, -1);   // autant de mots pour chacun
     return list.map(c => c.id);
   }
-  function liveHome() {
-    const gate = needAccount('Chaque joueur se connecte avec son compte Google, puis l\'un crée une salle et l\'autre la rejoint avec le code.');
-    if (gate) return gate;
-    const l = S().live;
-    const cards = Engine.cards(Engine.itemsFor(sel()), l), cnt = Engine.countWhich(cards), avail = cnt[l.which] || 0;
-    const n = l.n === 'all' ? avail : Math.min(avail, l.n);
-    return `<section class="panel"><h2>Rejoindre une salle</h2>
-        <div class="row"><input id="liveCode" class="codein" placeholder="CODE" maxlength="5" value="${esc(V.joinCode || '')}" autocapitalize="characters"><button class="btn primary" data-a="liveJoin">Rejoindre</button></div></section>
-      <h2 class="sec">Créer une salle</h2>
-      <section class="panel"><h2 class="step"><i>1</i>Quels textes ?</h2>${picker()}</section>
+  // réglages du duel : les mêmes à la création et dans la salle d'attente (pour l'hôte)
+  function liveSetupPanels(l, cnt) {
+    return `<section class="panel"><h2 class="step"><i>1</i>Quels textes ?</h2>${picker()}</section>
       <section class="panel"><h2 class="step"><i>2</i>Type de question</h2>${whatChips(l.what, 'liveWhat')}
         <h3>Sens</h3>${seg('liveOpt', 'dir', [['ar', 'Arabe → Français'], ['fr', 'Français → Arabe'], ['both', 'Les deux']], l.dir)}</section>
       <section class="panel"><h2 class="step"><i>3</i>Quelles cartes ?</h2>
@@ -883,7 +876,30 @@
         : l.mode === 'oral' ? '<p class="muted small">À l\'oral, il n\'y a pas de chrono : rejoignez le salon vocal pour vous entendre. Les rôles s\'inversent à chaque carte, et une seule faute rend la carte fausse.</p>'
           : `<h3>Temps par question</h3>${seg('liveOpt', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], l.time)}`}
         ${l.mode === 'speed' ? '' : `<h3>Après chaque question</h3>${seg('liveOpt', 'adv', [['auto', 'On passe tout seul'], ['manual', 'Bouton « Suivant »']], l.adv)}`}
-        ${l.mode === 'speed' ? '' : '<p class="muted small">Avec « Suivant », vous voyez la correction et vous pouvez en discuter avant de continuer. Le chrono peut aussi être mis en pause à tout moment.</p>'}</section>
+        ${l.mode === 'speed' ? '' : '<p class="muted small">Avec « Suivant », vous voyez la correction et vous pouvez en discuter avant de continuer. Le chrono peut aussi être mis en pause à tout moment.</p>'}</section>`;
+  }
+  // l'hôte change les réglages dans la salle : on les envoie à la salle (petit délai pour grouper les clics)
+  let lobbySyncT = null;
+  function liveLobbySync() {
+    if (V.name !== 'live' || !V.room || V.room.state !== 'lobby' || !isHost()) return;
+    clearTimeout(lobbySyncT);
+    lobbySyncT = setTimeout(() => {
+      if (V.name !== 'live' || !V.room || V.room.state !== 'lobby') return;
+      const l = S().live;
+      Cloud.updateSettings(V.code, Object.assign({}, V.room.settings, { l: sel(), n: l.n, mode: l.mode, time: l.time, adv: l.adv, what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order }))
+        .catch(e => toast(e.message));
+    }, 350);
+  }
+  function liveHome() {
+    const gate = needAccount('Chaque joueur se connecte avec son compte Google, puis l\'un crée une salle et l\'autre la rejoint avec le code.');
+    if (gate) return gate;
+    const l = S().live;
+    const cards = Engine.cards(Engine.itemsFor(sel()), l), cnt = Engine.countWhich(cards), avail = cnt[l.which] || 0;
+    const n = l.n === 'all' ? avail : Math.min(avail, l.n);
+    return `<section class="panel"><h2>Rejoindre une salle</h2>
+        <div class="row"><input id="liveCode" class="codein" placeholder="CODE" maxlength="5" value="${esc(V.joinCode || '')}" autocapitalize="characters"><button class="btn primary" data-a="liveJoin">Rejoindre</button></div></section>
+      <h2 class="sec">Créer une salle</h2>
+      ${liveSetupPanels(l, cnt)}
       <div class="cta-bar"><div class="cta-info"><b>${n}</b> question${n > 1 ? 's' : ''}<small>${esc(WHICH.find(w => w[0] === l.which)[1])} · ${cards.length} au total</small></div>
         <button class="btn primary lg" data-a="liveCreate" ${n ? '' : 'disabled'}>Créer la salle</button></div>`;
   }
@@ -1019,11 +1035,8 @@
         <section class="panel"><h3>Réglages de la partie</h3>
           <p class="small">${words} mots · ${st.n === 'all' ? 'toutes les' : st.n} questions${st.what ? ' · ' + Object.keys(CATS).filter(k => st.what[k]).map(k => CATS[k].label).join(', ') : ''} · ${st.mode === 'qcm' ? 'choix multiples' : st.mode === 'oral' ? 'à l\'oral, chacun son tour' : st.mode === 'speed' ? 'oral chrono, une manche chacun' : 'à écrire'}${isOral(st.mode) ? '' : ` · ${st.time} s par question`} · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
           ${missing.length ? `<p class="warn">Il te manque des leçons de cette partie (mets l'appli à jour).</p>` : ''}
-          ${isHost() ? `<h3>Questions</h3>${seg('liveSet', 'n', [[5, '5'], [10, '10'], [15, '15'], [20, '20'], ['all', 'Toutes']], st.n)}
-            <h3>Réponses</h3>${seg('liveSet', 'mode', [['qcm', 'Choix multiples'], ['type', 'Écrire'], ['oral', 'À l\'oral'], ['speed', 'Oral chrono']], st.mode)}
-            ${isOral(st.mode) ? '' : `<h3>Temps</h3>${seg('liveSet', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], st.time)}`}
-            <h3>Après chaque question</h3>${seg('liveSet', 'adv', [['auto', 'Automatique'], ['manual', 'Bouton « Suivant »']], st.adv || 'auto')}
-            <button class="link" data-a="liveUseSel">Utiliser mes réglages actuels de Duel (${Engine.itemsFor(sel()).length} mots)</button>` : ''}</section>
+          ${isHost() ? '<p class="muted small">Change les textes, le niveau ou le type de questions ci-dessous : ton binôme voit les nouveaux réglages tout de suite.</p>' : "<p class='muted small'>L'hôte choisit les réglages.</p>"}</section>
+        ${isHost() ? (() => { const l = S().live, cards = Engine.cards(Engine.itemsFor(sel()), l); return liveSetupPanels(l, Engine.countWhich(cards)); })() : ''}
         ${isHost() ? `<button class="btn primary lg wide" data-a="liveStart" ${o ? '' : 'disabled'}>${o ? 'Lancer la partie' : 'En attente de ton binôme…'}</button>`
           : `<div class="waiting"><span class="dots"><i></i><i></i><i></i></span>En attente du lancement par l'hôte</div>`}`;
     }
@@ -1465,16 +1478,16 @@
       go(back[0], back[1] || {});
     },
     saveName: () => { const v = (document.getElementById('nameIn').value || '').trim(); if (!v) return; S().name = v; Store.save(); toast('Enregistré'); render(); },
-    setCenter: b => { S().center = b.dataset.v; Store.save(); FX.sound.tap(); render(); },
-    selLesson: b => { const id = b.dataset.id, s = S().sel; const i = s.indexOf(id); if (i >= 0) s.splice(i, 1); else s.push(id); Store.save(); FX.sound.tap(); render(); },
+    setCenter: b => { S().center = b.dataset.v; Store.save(); FX.sound.tap(); render(); liveLobbySync(); },
+    selLesson: b => { const id = b.dataset.id, s = S().sel; const i = s.indexOf(id); if (i >= 0) s.splice(i, 1); else s.push(id); Store.save(); FX.sound.tap(); render(); liveLobbySync(); },
     selDeck: b => {
       const d = LIB.decks.find(x => x.id === b.dataset.id); const ids = d.lessons.map(l => l.id);
       const allOn = ids.every(id => S().sel.includes(id));
       S().sel = S().sel.filter(id => !ids.includes(id)); if (!allOn) S().sel.push(...ids);
-      Store.save(); FX.sound.tap(); render();
+      Store.save(); FX.sound.tap(); render(); liveLobbySync();
     },
     togDeck: b => { const id = b.dataset.id; OPEN.has(id) ? OPEN.delete(id) : OPEN.add(id); FX.sound.tap(); render(); },
-    selNone: () => { S().sel = []; Store.save(); render(); },
+    selNone: () => { S().sel = []; Store.save(); render(); liveLobbySync(); },
     quickReview: () => {
       const cards = Engine.cards(Engine.itemsFor(sel()), S().rev);
       if (Engine.srsQueue(cards).length) { S().rev.mode = 'flip'; S().rev.which = 'due'; Store.save(); startRevision(); }
@@ -1562,8 +1575,8 @@
     signOut: async () => { if (!confirm('Se déconnecter ? Ta progression reste aussi sur cet appareil.')) return; await Cloud.signOut(); toast('Déconnecté'); render(); },
     syncNow: async () => { await Cloud.pull(); rebuild(); render(); toast('Synchronisé'); },
     // duel en direct
-    liveWhat: b => { const w = S().live.what; w[b.dataset.k] = !w[b.dataset.k]; Store.save(); FX.sound.tap(); render(); },
-    liveOpt: b => { S().live[b.dataset.k] = parseV(b.dataset.v); if (b.dataset.k === 'mode') S().live.time = S().live.mode === 'type' ? 60 : S().live.mode === 'speed' ? 10 : 30; Store.save(); render(); },
+    liveWhat: b => { const w = S().live.what; w[b.dataset.k] = !w[b.dataset.k]; Store.save(); FX.sound.tap(); render(); liveLobbySync(); },
+    liveOpt: b => { S().live[b.dataset.k] = parseV(b.dataset.v); if (b.dataset.k === 'mode') S().live.time = S().live.mode === 'type' ? 60 : S().live.mode === 'speed' ? 10 : 30; Store.save(); render(); liveLobbySync(); },
     liveCreate: async b => {
       b.disabled = true;
       const l = S().live;
