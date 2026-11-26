@@ -879,7 +879,7 @@
       <section class="panel"><h2 class="step"><i>4</i>Comment ?</h2>
         <div class="modes">${LIVE_MODES.map(([k, i, t, d]) => `<button class="mode ${l.mode === k ? 'on' : ''}" data-a="liveOpt" data-k="mode" data-v="${k}"><span class="mi">${ico(i)}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div></section>
       <section class="panel"><h2 class="step"><i>5</i>Règles du duel</h2>
-        ${l.mode === 'speed' ? `<h3>Temps par mot</h3>${seg('liveOpt', 'time', SPEED_T, l.time)}<p class="muted small">Ton binôme répond d'abord à la moitié des mots, puis c'est ton tour sur l'autre moitié. Plus la réponse est rapide, plus elle rapporte. Rejoignez le salon vocal pour vous entendre.</p>`
+        ${l.mode === 'speed' ? `<p class="muted small">Ton binôme répond d'abord à la moitié des mots, puis c'est ton tour sur l'autre moitié. Un seul chrono tourne pendant toute la manche : enchaîne les mots le plus vite possible. Chaque mot juste rapporte des points, et plus il est rapide, plus il rapporte. Rejoignez le salon vocal pour vous entendre.</p>`
         : l.mode === 'oral' ? '<p class="muted small">À l\'oral, il n\'y a pas de chrono : rejoignez le salon vocal pour vous entendre. Les rôles s\'inversent à chaque carte, et une seule faute rend la carte fausse.</p>'
           : `<h3>Temps par question</h3>${seg('liveOpt', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], l.time)}`}
         ${l.mode === 'speed' ? '' : `<h3>Après chaque question</h3>${seg('liveOpt', 'adv', [['auto', 'On passe tout seul'], ['manual', 'Bouton « Suivant »']], l.adv)}`}
@@ -916,7 +916,15 @@
   }
   const opp = () => { const r = V.room; if (!r) return null; const id = Object.keys(r.players).find(k => k !== Cloud.uid()); return id ? Object.assign({ id }, r.players[id]) : null; };
   const mine = () => (V.room ? V.room.players[Cloud.uid()] : null);
-  const liveLim = () => V.room.settings.time * 1000;
+  const liveLim = () => (V.room.settings.mode === 'speed' ? 3600e3 : V.room.settings.time * 1000);
+  const SPEED_REF = 10000;   // oral chrono : bonus de rapidité calculé sur 10 s par mot
+  const fmtChrono = ms => { const s = Math.max(0, ms) / 1000; return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}.${Math.floor((s * 10) % 10)}`; };
+  // chrono de la manche : temps de tous les mots déjà faits + mot en cours
+  function roundElapsed(r) {
+    const ro = oralRoles(r, V.qi), ans = (r.players[ro.ans] || {}).ans || {};
+    let t = 0; for (let i = V.qi < ro.half ? 0 : ro.half; i < V.qi; i++) if (ans[i]) t += ans[i].ms || 0;
+    return t + (ans[V.qi] ? ans[V.qi].ms || 0 : V.paused ? liveLim() - V.paused.left : Date.now() - V.t0);
+  }
   function onRoom(data, err) {
     if (V.name !== 'live') return;
     V.loading = false; V.room = data; V.err = err ? err.message : null;
@@ -952,17 +960,8 @@
       V.lastFetch = Date.now(); const code = V.code;
       Cloud.fetchRoom(code).then(d => { if (d && V.name === 'live' && V.code === code && JSON.stringify(d) !== JSON.stringify(V.room)) onRoom(d); }).catch(() => {});
     }
+    if (r.settings.mode === 'speed') { const t = document.getElementById('lt'); if (t) t.textContent = fmtChrono(roundElapsed(r)); return; }
     if (V.paused || r.settings.mode === 'oral') return;
-    if (r.settings.mode === 'speed') {
-      const lim = liveLim(), left = lim - (Date.now() - V.t0);
-      const t = document.getElementById('lt'); if (t) t.textContent = Math.max(0, Math.ceil(left / 1000));
-      const tb = document.getElementById('tb'); if (tb) { tb.style.transform = `scaleX(${Math.max(0, left / lim)})`; tb.classList.toggle('hurry', left < 3000); }
-      const ro = oralRoles(r, V.qi), p = r.players[ro.ans];
-      if (left <= 0 && ro.ask === Cloud.uid() && !(p && p.ans && p.ans[V.qi]) && V.judging !== V.qi) {
-        V.judging = V.qi; Cloud.judge(V.code, V.qi, ro.ans, { ok: false, n: 0, pts: 0, ms: lim, to: true, oral: true }).catch(() => { V.judging = null; });
-      }
-      return;
-    }
     const lim = liveLim(), el = Date.now() - V.t0, left = lim - el;
     const t = document.getElementById('lt'); if (t) t.textContent = Math.max(0, Math.ceil(left / 1000));
     const tb = document.getElementById('tb'); if (tb) { tb.style.transform = `scaleX(${Math.max(0, left / lim)})`; tb.classList.toggle('hurry', left < 8000); }
@@ -1005,6 +1004,7 @@
     const st = r.settings, o = opp();
     const playing = r.state === 'playing' && V.qs;
     const quit = `<div class="stop"><button class="icon quit" data-a="liveQuit" aria-label="Quitter">${ico('x')}</button><span class="roomcode">Salle <b>${esc(V.code)}</b></span>
+      ${playing ? `<button class="btn sm ghost" data-a="liveStop">${ico('x')}Arrêter la partie</button>` : ''}
       ${playing && st.mode !== 'oral' ? (V.paused ? `<button class="btn sm primary" data-a="liveResume">${ico('play')}Reprendre</button>` : `<button class="btn sm" data-a="livePause">${ico('pause')}Pause</button>`) : ''}</div>`;
     if (r.state === 'lobby') {
       const missing = st.l.filter(id => !LIB.lessons[id]);
@@ -1017,11 +1017,11 @@
           <p class="muted small">${ico('headset')} Rejoignez le salon vocal en bas de l'écran pour vous parler pendant la partie.</p></section>
         ${scoreboard(r)}
         <section class="panel"><h3>Réglages de la partie</h3>
-          <p class="small">${words} mots · ${st.n === 'all' ? 'toutes les' : st.n} questions${st.what ? ' · ' + Object.keys(CATS).filter(k => st.what[k]).map(k => CATS[k].label).join(', ') : ''} · ${st.mode === 'qcm' ? 'choix multiples' : st.mode === 'oral' ? 'à l\'oral, chacun son tour' : st.mode === 'speed' ? 'oral chrono, une manche chacun' : 'à écrire'}${st.mode === 'oral' ? '' : ` · ${st.time} s par ${st.mode === 'speed' ? 'mot' : 'question'}`} · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
+          <p class="small">${words} mots · ${st.n === 'all' ? 'toutes les' : st.n} questions${st.what ? ' · ' + Object.keys(CATS).filter(k => st.what[k]).map(k => CATS[k].label).join(', ') : ''} · ${st.mode === 'qcm' ? 'choix multiples' : st.mode === 'oral' ? 'à l\'oral, chacun son tour' : st.mode === 'speed' ? 'oral chrono, une manche chacun' : 'à écrire'}${isOral(st.mode) ? '' : ` · ${st.time} s par question`} · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
           ${missing.length ? `<p class="warn">Il te manque des leçons de cette partie (mets l'appli à jour).</p>` : ''}
           ${isHost() ? `<h3>Questions</h3>${seg('liveSet', 'n', [[5, '5'], [10, '10'], [15, '15'], [20, '20'], ['all', 'Toutes']], st.n)}
             <h3>Réponses</h3>${seg('liveSet', 'mode', [['qcm', 'Choix multiples'], ['type', 'Écrire'], ['oral', 'À l\'oral'], ['speed', 'Oral chrono']], st.mode)}
-            ${st.mode === 'oral' ? '' : st.mode === 'speed' ? `<h3>Temps par mot</h3>${seg('liveSet', 'time', SPEED_T, st.time)}` : `<h3>Temps</h3>${seg('liveSet', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], st.time)}`}
+            ${isOral(st.mode) ? '' : `<h3>Temps</h3>${seg('liveSet', 'time', [[20, '20 s'], [30, '30 s'], [45, '45 s'], [60, '60 s'], [90, '90 s'], [120, '2 min']], st.time)}`}
             <h3>Après chaque question</h3>${seg('liveSet', 'adv', [['auto', 'Automatique'], ['manual', 'Bouton « Suivant »']], st.adv || 'auto')}
             <button class="link" data-a="liveUseSel">Utiliser mes réglages actuels de Duel (${Engine.itemsFor(sel()).length} mots)</button>` : ''}</section>
         ${isHost() ? `<button class="btn primary lg wide" data-a="liveStart" ${o ? '' : 'disabled'}>${o ? 'Lancer la partie' : 'En attente de ton binôme…'}</button>`
@@ -1065,14 +1065,14 @@
       <div class="typ">${esc(T[it.t] ? T[it.t].label : '')}${q.hidden.includes('prep') && it.prepFr ? ` · ${esc('sens : ' + it.prepFr)}` : ''}</div></div><div class="holes">${holes}</div></div>`;
     let ctl;
     if (speed) {
-      const lim = liveLim(), left = V.paused ? V.paused.left : lim - (Date.now() - V.t0);
       const turn = V.qi === roles.half ? `<div class="notice turn">${ico('repeat')}<span>${roles.ans === Cloud.uid() ? "Changement de manche : <b>c'est ton tour</b> de répondre, le plus vite possible !" : `Changement de manche : c'est au tour de <b>${name(roles.ans)}</b> de répondre`}</span></div>` : '';
       const pauseBox = V.paused ? `<div class="pausebox">${ico('pause')}<div><b>Partie en pause</b><small>Le chrono est arrêté pour vous deux.</small></div><button class="btn primary" data-a="liveResume">${ico('play')}Reprendre</button></div>` : '';
-      const head = `${scoreboard(r)}${turn}<div class="livebar"><span class="cnt">Mot ${V.qi + 1}/${V.qs.length}</span><span class="role ${asking ? 'ask' : 'ans'}">${role}</span><span class="timer ${V.paused ? 'paused' : ''}">${ico(V.paused ? 'pause' : 'clock')}<b id="lt">${Math.max(0, Math.ceil(left / 1000))}</b> s</span></div>${timebar(a ? 0 : left / lim)}`;
-      const res = a ? `<div class="reveal"><div class="rr ${a.ok ? 'ok' : 'ko'}">${avatar(ansP)}<b>${name(roles.ans)}</b><span>${a.to ? 'temps écoulé' : a.ok ? `juste · ${(a.ms / 1000).toFixed(1)} s` : 'faux'}</span><em>+${a.pts}</em></div></div>`
-        : asking ? `<div class="judge"><button class="btn lg danger" data-a="oralJudge" data-v="0" ${V.paused ? 'disabled' : ''}>${ico('x')}Faux</button><button class="btn lg success" data-a="oralJudge" data-v="1" ${V.paused ? 'disabled' : ''}>${ico('check')}Juste</button></div><p class="muted small center">Appuie sur « Juste » dès que ${name(roles.ans)} a donné la bonne réponse.</p>`
+      const inRound = V.qi < roles.half ? V.qi + 1 : V.qi + 1 - roles.half, roundN = V.qi < roles.half ? roles.half : V.qs.length - roles.half;
+      const head = `${scoreboard(r)}${turn}<div class="livebar"><span class="cnt">Manche ${V.qi < roles.half ? 1 : 2} · mot ${inRound}/${roundN}</span><span class="role ${asking ? 'ask' : 'ans'}">${role}</span><span class="timer chrono ${V.paused ? 'paused' : ''}">${ico(V.paused ? 'pause' : 'clock')}<b id="lt">${fmtChrono(roundElapsed(r))}</b></span></div>`;
+      const res = a ? `<div class="reveal"><div class="rr ${a.ok ? 'ok' : 'ko'}">${avatar(ansP)}<b>${name(roles.ans)}</b><span>${a.ok ? `juste · ${(a.ms / 1000).toFixed(1)} s` : 'faux'}</span><em>+${a.pts}</em></div></div>`
+        : asking ? `<div class="judge top"><button class="btn lg danger" data-a="oralJudge" data-v="0" ${V.paused ? 'disabled' : ''}>${ico('x')}Faux</button><button class="btn lg success" data-a="oralJudge" data-v="1" ${V.paused ? 'disabled' : ''}>${ico('check')}Juste</button></div>`
         : `<div class="waiting">${avatar(r.players[roles.ask] || {})}<span>Vite ! ${name(roles.ask)} valide ta réponse</span><span class="dots"><i></i><i></i><i></i></span></div>`;
-      return `${quit}${head}${pauseBox}<div class="${V.paused ? 'frozen' : ''}">${card}</div>${res}`;
+      return `${quit}${head}${pauseBox}${asking ? res : ''}<div class="${V.paused ? 'frozen' : ''}">${card}</div>${asking ? '' : res}`;
     }
     if (a) ctl = `<div class="reveal"><div class="rr ${a.ok ? 'ok' : 'ko'}">${avatar(ansP)}<b>${name(roles.ans)}</b><span>${a.ok ? 'juste' : 'faux'}</span><em>+${a.pts}</em></div>
         ${(q.hidden.includes('prep') ? it.prepEx : it.ex) ? `<div class="ex">${ar(q.hidden.includes('prep') ? it.prepEx : it.ex)}</div>` : ''}
@@ -1091,7 +1091,8 @@
       const a = Object.values(p.ans || {}); const ok = a.filter(x => x.ok).length;
       const okA = a.filter(x => x.ok), base = r.settings.mode === 'speed' ? okA : a;
       const t = base.length ? base.reduce((s, x) => s + x.ms, 0) / base.length : 0;
-      return { ok, t, n: isOral(r.settings.mode) ? a.length : n };
+      const tot = a.reduce((s, x) => s + (x.ms || 0), 0);
+      return { ok, t, tot, n: isOral(r.settings.mode) ? a.length : n };
     };
     const sm = stats(m), so = o ? stats(o) : null;
     const bits = p => Array.from({ length: n }, (_, i) => { const a = p.ans && p.ans[i]; return `<i class="${a ? (a.ok ? 'y' : 'n') : ''}" data-tip="Q${i + 1} : ${a ? (a.ok ? 'juste' : 'faux') + ' · ' + (a.ms / 1000).toFixed(1) + ' s' : '—'}"></i>`; }).join('');
@@ -1103,6 +1104,7 @@
       <table class="vs"><tr><th></th><th>${esc(m.name)}</th><th>${o ? esc(o.name) : ''}</th></tr>
         <tr><td>Points</td><td><b>${m.score}</b></td><td><b>${o ? o.score : ''}</b></td></tr>
         <tr><td>Bonnes réponses</td><td>${sm.ok}/${sm.n}</td><td>${so ? so.ok + '/' + so.n : ''}</td></tr>
+        ${r.settings.mode === 'speed' ? `<tr><td>Temps de la manche</td><td>${fmtChrono(sm.tot)}</td><td>${so ? fmtChrono(so.tot) : ''}</td></tr>` : ''}
         ${r.settings.mode === 'oral' ? '' : `<tr><td>${r.settings.mode === 'speed' ? 'Temps moyen (réponses justes)' : 'Temps moyen'}</td><td>${(sm.t / 1000).toFixed(1)} s</td><td>${so ? (so.t / 1000).toFixed(1) + ' s' : ''}</td></tr>`}
         <tr><td>Questions</td><td class="bits">${bits(m)}</td><td class="bits">${o ? bits(o) : ''}</td></tr></table>
       ${rv ? `<p class="h2h">Bilan contre ${esc(o.name)} : <b class="w">${rv.w} victoire${rv.w > 1 ? 's' : ''}</b> · <b class="d">${rv.d} nul${rv.d > 1 ? 's' : ''}</b> · <b class="l">${rv.l} défaite${rv.l > 1 ? 's' : ''}</b></p>` : ''}
@@ -1582,13 +1584,14 @@
       Cloud.updateSettings(V.code, st).then(() => Cloud.startRoom(V.code));
     },
     liveSubmit: () => submitLive(false),
+    liveStop: () => { if (!V.room || !confirm('Arrêter la partie ? Vous restez tous les deux dans la salle et pouvez en relancer une.')) return; Cloud.rematch(V.code, Object.assign({}, V.room.settings)).catch(e => toast(e.message)); },
     oralShow: () => { V.shown = V.qi; FX.sound.flip(); render(); },
     oralJudge: b => {
       if (!V.room || V.judging === V.qi) return;
       if (V.paused) return;
       const ok = b.dataset.v === '1', roles = oralRoles(V.room, V.qi), q = V.qs[V.qi];
-      const speed = V.room.settings.mode === 'speed', lim = liveLim(), ms = speed ? Math.min(Date.now() - V.t0, lim) : 0;
-      const pts = ok ? 100 + (speed ? Math.round(100 * Math.max(0, 1 - ms / lim)) : 0) : 0;
+      const speed = V.room.settings.mode === 'speed', ms = speed ? Date.now() - V.t0 : 0;
+      const pts = ok ? 100 + (speed ? Math.round(100 * Math.max(0, 1 - ms / SPEED_REF)) : 0) : 0;
       V.judging = V.qi;
       Cloud.judge(V.code, V.qi, roles.ans, { ok, n: ok ? q.hidden.length : 0, pts, ms, oral: true })
         .then(() => (ok ? FX.sound.ok() : FX.sound.bad())).catch(e => { V.judging = null; toast(e.message); });
