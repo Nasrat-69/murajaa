@@ -84,6 +84,7 @@
   const SESSION = ['flash', 'exam', 'paper', 'rush', 'tf', 'rain', 'anagram', 'live'];
   const NAV = [['home', 'home', 'Accueil'], ['reviewSetup', 'cards', 'Réviser'], ['examSetup', 'exam', 'Examen'], ['games', 'game', 'Jeux'], ['words', 'book', 'Mots']];
   function render() {
+    setTimeout(() => window.dispatchEvent(new Event('murajaa:render')), 0);
     // garde ce qui est en cours de saisie (utile quand l'adversaire répond pendant qu'on écrit)
     const drafts = {}; let focusF = null;
     app.querySelectorAll('.hole-in:not([readonly])').forEach(i => { drafts[i.dataset.f] = i.value; if (document.activeElement === i) focusF = i.dataset.f; });
@@ -1858,5 +1859,21 @@
   if (h.startsWith('#duel=')) { V = { name: 'duel', tab: 'code', join: h.slice(6) }; history.replaceState(null, '', location.pathname); }
   else if (h.startsWith('#live=')) { const c = h.slice(6).toUpperCase(); V = { name: 'duel', tab: 'live', joinCode: c, pendingLive: Cloud.st.enabled ? c : null }; history.replaceState(null, '', location.pathname); }
   render();
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
+  // mise à jour automatique : la page ouverte se recharge quand une nouvelle version est en ligne
+  // (pas au milieu d'une partie ou d'une révision : on attend la fin)
+  const busy = () => (V.name === 'live' && V.room && V.room.state === 'playing') || ['flash', 'exam', 'paper', 'rush', 'tf', 'rain', 'anagram'].includes(V.name);
+  let updatePending = false;
+  window.addEventListener('murajaa:render', () => { if (updatePending && !busy()) location.reload(); });
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      setInterval(() => reg.update().catch(() => {}), 5 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {});
+    let hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController) { hadController = true; return; }          // toute première installation : rien à recharger
+      if (busy()) { updatePending = true; toast("Nouvelle version disponible : elle s'installera à la fin de la partie.", 4000); }
+      else location.reload();
+    });
+  }
 })();
