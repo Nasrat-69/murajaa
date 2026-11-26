@@ -742,3 +742,4 @@ body.call-on .main.session { padding-bottom: 200px; }
 /* le salon vocal ne cache plus les boutons de la partie */
 body.call-on .main { padding-bottom: 340px; }
 .stop { flex-wrap: wrap; }
+.panel.missed { text-align: start; display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
