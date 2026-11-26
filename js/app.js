@@ -954,7 +954,7 @@
       const meP = data.players[Cloud.uid()]; V.recAns = V.recAns || new Set();
       for (const [k, a] of Object.entries((meP && meP.ans) || {})) {
         const key = V.code + ':' + st.seed + ':' + k;
-        if (!V.recAns.has(key) && V.qs[k]) { V.recAns.add(key); Store.answer(V.qs[k].item.id, !!a.ok); }
+        if (!V.recAns.has(key) && V.qs[k]) { V.recAns.add(key); Store.answer(V.qs[k].item.id, !!a.ok); if (!a.ok) noteMissed(V.qs[k].item.id); }
       }
     }
     if (data.state === 'playing') {
@@ -1006,6 +1006,7 @@
     const v = {}; q.hidden.forEach(f => { v[f] = [String(cur[f].val ?? '').slice(0, 80), !!cur[f].ok]; });
     Cloud.answer(V.code, V.qi, { ok: all, n: nOk, pts, ms, to: !!timeout, v }).catch(e => toast('Envoi impossible : ' + e.message));
     Store.answer(q.item.id, all);
+    if (!all) noteMissed(q.item.id);
     if (all) FX.sound.ok(); else { FX.sound.bad(); FX.buzz(60); }
     if (pts) FX.floatCenter('+' + pts, 'pts');
     render();
@@ -1028,6 +1029,7 @@
     const st = r.settings, o = opp();
     const playing = r.state === 'playing' && V.qs;
     const quit = `<div class="stop"><button class="icon quit" data-a="liveQuit" aria-label="Quitter">${ico('x')}</button><span class="roomcode">Salle <b>${esc(V.code)}</b></span>
+      ${playing && (V.missedIds || []).length ? `<span class="misscount" data-tip="Enregistrés dans « Mots difficiles »">${ico('target')}${V.missedIds.length} raté${V.missedIds.length > 1 ? 's' : ''}</span>` : ''}
       ${playing ? `<button class="btn sm ghost" data-a="liveStop">${ico('x')}Arrêter la partie</button>` : ''}
       ${playing && st.mode !== 'oral' ? (V.paused ? `<button class="btn sm primary" data-a="liveResume">${ico('play')}Reprendre</button>` : `<button class="btn sm" data-a="livePause">${ico('pause')}Pause</button>`) : ''}</div>`;
     if (r.state === 'lobby') {
@@ -1040,6 +1042,7 @@
           ${location.protocol.startsWith('http') ? `<button class="btn sm" data-a="copy" data-text="${esc(location.origin + location.pathname + '#live=' + V.code)}">${ico('link')}Copier le lien</button>` : ''}</div>
           <p class="muted small">${ico('headset')} Rejoignez le salon vocal en bas de l'écran pour vous parler pendant la partie.</p></section>
         ${scoreboard(r)}
+        ${missedPanel(missedItems(), 'Mes mots ratés dans cette salle')}
         <section class="panel"><h3>Réglages de la partie</h3>
           <p class="small">${words} mots · ${st.n === 'all' ? 'toutes les' : st.n} questions${st.what ? ' · ' + Object.keys(CATS).filter(k => st.what[k]).map(k => CATS[k].label).join(', ') : ''} · ${st.mode === 'qcm' ? 'choix multiples' : st.mode === 'oral' ? 'à l\'oral, chacun son tour' : st.mode === 'speed' ? 'oral chrono, une manche chacun' : 'à écrire'}${isOral(st.mode) ? '' : ` · ${st.time} s par question`} · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
           ${missing.length ? `<p class="warn">Il te manque des leçons de cette partie (mets l'appli à jour).</p>` : ''}
@@ -1104,6 +1107,15 @@
     else ctl = `<div class="waiting">${avatar(r.players[roles.ask] || {})}<span>${name(roles.ask)} écoute ta réponse</span><span class="dots"><i></i><i></i><i></i></span></div>`;
     return `${quit}${scoreboard(r)}<div class="livebar"><span class="cnt">Question ${V.qi + 1}/${V.qs.length}</span><span class="role ${asking ? 'ask' : 'ans'}">${role}</span></div>${card}${ctl}`;
   }
+  // mots ratés depuis l'entrée dans la salle (gardés même si on arrête la partie)
+  function noteMissed(id) { V.missedIds = V.missedIds || []; if (!V.missedIds.includes(id)) V.missedIds.push(id); }
+  const missedItems = () => (V.missedIds || []).map(id => LIB.items[id]).filter(Boolean);
+  function missedPanel(list, title) {
+    if (!list.length) return '';
+    return `<section class="panel missed"><b>${ico('target', 'red')} ${title} : ${list.length}</b><p class="muted small">Ils sont enregistrés dans « Mots difficiles » (Réviser → Quelles cartes ?) pour les retravailler quand tu veux.</p>
+      <div class="chips">${list.slice(0, 12).map(it => `<span class="chip">${ar(Engine.head(it), 'sm')}</span>`).join('')}${list.length > 12 ? `<span class="chip">+${list.length - 12}</span>` : ''}</div>
+      <button class="btn" data-a="liveReviewMissed">${ico('repeat')}Réviser ces mots maintenant</button></section>`;
+  }
   // mots ratés par moi pendant ce duel (en oral : seulement ceux où c'était mon tour)
   function liveMissed(r) {
     const m = mine() || {}, oral = isOral(r.settings.mode), seen = new Set();
@@ -1136,9 +1148,7 @@
         ${r.settings.mode === 'oral' ? '' : `<tr><td>${r.settings.mode === 'speed' ? 'Temps moyen (réponses justes)' : 'Temps moyen'}</td><td>${(sm.t / 1000).toFixed(1)} s</td><td>${so ? (so.t / 1000).toFixed(1) + ' s' : ''}</td></tr>`}
         <tr><td>Questions</td><td class="bits">${bits(m)}</td><td class="bits">${o ? bits(o) : ''}</td></tr></table>
       ${rv ? `<p class="h2h">Bilan contre ${esc(o.name)} : <b class="w">${rv.w} victoire${rv.w > 1 ? 's' : ''}</b> · <b class="d">${rv.d} nul${rv.d > 1 ? 's' : ''}</b> · <b class="l">${rv.l} défaite${rv.l > 1 ? 's' : ''}</b></p>` : ''}
-      ${missed.length ? `<section class="panel missed"><b>${ico('target', 'red')} Mes mots ratés : ${missed.length}</b><p class="muted small">Ils sont enregistrés dans « Mots difficiles » (Réviser → Quelles cartes ?) pour les retravailler quand tu veux.</p>
-        <div class="chips">${missed.slice(0, 12).map(it => `<span class="chip">${ar(Engine.head(it), 'sm')}</span>`).join('')}${missed.length > 12 ? `<span class="chip">+${missed.length - 12}</span>` : ''}</div>
-        <button class="btn" data-a="liveReviewMissed">${ico('repeat')}Réviser ces mots maintenant</button></section>` : ''}
+      ${missedPanel(missed, 'Mes mots ratés')}
       <div class="col">${isHost() ? `<button class="btn primary lg" data-a="liveRematch">Revanche</button>` : `<div class="waiting">L'hôte peut lancer une revanche</div>`}
         <button class="btn ghost" data-a="liveQuit">Quitter la salle</button></div></div>`;
   }
@@ -1617,7 +1627,8 @@
     liveSubmit: () => submitLive(false),
     liveReviewMissed: () => {
       if (!V.room) return;
-      const st = V.room.settings, items = liveMissed(V.room);
+      const st = V.room.settings, seen = new Set();
+      const items = [...(V.room.state === 'done' ? liveMissed(V.room) : []), ...missedItems()].filter(it => !seen.has(it.id) && seen.add(it.id));
       let list = Engine.cards(items, { what: st.what || S().rev.what, dir: st.dir || 'both' });
       if (!list.length) list = Engine.cards(items, { what: { tr: true }, dir: 'both' });
       if (!list.length) { toast('Aucun mot à réviser'); return; }

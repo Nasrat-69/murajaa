@@ -743,3 +743,5 @@ body.call-on .main.session { padding-bottom: 200px; }
 body.call-on .main { padding-bottom: 340px; }
 .stop { flex-wrap: wrap; }
 .panel.missed { text-align: start; display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.misscount { display: inline-flex; align-items: center; gap: 4px; font-size: .8rem; font-weight: 700; color: var(--bad); background: var(--bad-soft); border-radius: 99px; padding: 3px 10px; }
+.misscount svg { width: 14px; height: 14px; }
