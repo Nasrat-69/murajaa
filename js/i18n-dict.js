@@ -1,6 +1,7 @@
 /* Traductions de l'interface : [français, anglais, russe]. {n} = un nombre. */
 (() => {
   const T = [
+    ["Ce compte n’a encore aucun mot raté. Chaque compte a sa propre liste : les mots ratés avec ce compte (en révision, à l’examen, dans les jeux ou en duel) apparaîtront ici et dans l’onglet « À revoir ».", "This account has no missed words yet. Each account has its own list: words missed with this account (review, exam, games or duel) will show here and in the “To review” tab.", "У этого аккаунта пока нет ошибок. У каждого аккаунта свой список: ошибки этого аккаунта (повторение, экзамен, игры, дуэль) появятся здесь и во вкладке «Повторить»."],
     ["À revoir", "To review", "Повторить"],
     ["Aucun mot à revoir", "No words to review", "Нет слов для повторения"],
     ["Les mots que tu rates (révision, examen, jeux, duel) arrivent ici tout de suite. Ils en sortent quand tu les réussis à nouveau.", "Words you miss (review, exam, games, duel) land here right away. They leave once you get them right again.", "Слова с ошибками (повторение, экзамен, игры, дуэль) сразу попадают сюда и уходят, когда ты снова отвечаешь верно."],

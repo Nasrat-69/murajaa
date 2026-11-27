@@ -941,7 +941,7 @@
     return `<section class="panel missed"><h2>${ico('target', 'red')} Tes mots ratés pour ce duel</h2>
       ${w.groups.length ? `<p class="muted small">Décoche les textes que tu ne veux pas mettre dans la partie.</p>
         <div class="pchips">${w.groups.map(g => `<button class="pchip ${g.on ? 'on' : ''}" data-a="myWeakTog" data-id="${esc(g.l.id)}"><span>${esc(g.l.title)}</span><small>${g.items.length}</small></button>`).join('')}</div>`
-        : '<p class="muted small">Tu n\u2019as aucun mot raté pour l\u2019instant.</p>'}
+        : '<p class="notice">Ce compte n’a encore aucun mot raté. Chaque compte a sa propre liste : les mots ratés avec ce compte (en révision, à l’examen, dans les jeux ou en duel) apparaîtront ici et dans l’onglet « À revoir ».</p>'}
       <p class="small"><b>Toi : ${w.ids.length}</b>${r ? ` · ${o ? `<b>${esc(o.name)} : ${ow ? ow.ids.length : '…'}</b>` : 'en attente de ton binôme'} · <b>Ensemble : ${both} mots</b>` : ''}</p></section>`;
   }
   function liveCardList(st) {
@@ -1145,7 +1145,7 @@
           ${location.protocol.startsWith('http') ? `<button class="btn sm" data-a="copy" data-text="${esc(location.origin + location.pathname + '#live=' + V.code)}">${ico('link')}Copier le lien</button>` : ''}</div>
           <p class="muted small">${ico('headset')} Rejoignez le salon vocal en bas de l'écran pour vous parler pendant la partie.</p></section>
         ${scoreboard(r)}
-        ${st.src === 'missed' ? myWeakPanel(r) : ''}
+        ${st.src === 'missed' ? (later(() => pushMyWeak(false), 0), myWeakPanel(r)) : ''}
         ${missedPanel(missedItems(), 'Mes mots ratés dans cette salle')}
         <section class="panel"><h3>Réglages de la partie</h3>
           <p class="small">${st.src === 'missed' ? 'Nos mots ratés' : words + ' mots'} · ${st.n === 'all' ? 'toutes les' : st.n} questions${st.what ? ' · ' + Object.keys(CATS).filter(k => st.what[k]).map(k => CATS[k].label).join(', ') : ''}${st.parts === 'parts' ? ' · par parties' : ''} · ${st.mode === 'qcm' ? 'choix multiples' : st.mode === 'oral' ? 'à l\'oral, chacun son tour' : st.mode === 'speed' ? 'oral chrono, une manche chacun' : 'à écrire'}${isOral(st.mode) ? '' : ` · ${st.time} s par question`} · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
