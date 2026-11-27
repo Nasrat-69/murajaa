@@ -162,6 +162,7 @@ const Cloud = (() => {
   const pause = (c, qi, left) => room(c).update({ paused: { by: uid(), qi, left: Math.max(0, Math.round(left)) } });
   const resume = c => room(c).update({ paused: null });
   // appel vocal / vidéo (WebRTC, signalisation dans Firestore)
+  const setWeak = (c, w) => room(c).update({ ['players.' + uid() + '.weak']: w });
   const setCall = (c, info) => room(c).update({ ['call.' + uid()]: info ? info : FV().delete() });
   const rtc = c => room(c).collection('rtc').doc('main');
   const arrayUnion = v => FV().arrayUnion(v);
@@ -184,7 +185,7 @@ const Cloud = (() => {
   return {
     st, init, signIn, signOut, pull, pushNow, profiles, uid,
     createRoom, joinRoom, watchRoom, fetchRoom, judge, updateSettings, startRoom, advance, answer, leaveRoom, rematch,
-    advanceFrom, pause, resume, setCall, rtc, arrayUnion, share, getShared, isAdmin, saveBase, get base() { return base; },
+    advanceFrom, pause, resume, setCall, setWeak, rtc, arrayUnion, share, getShared, isAdmin, saveBase, get base() { return base; },
     on: f => { subs.add(f); return () => subs.delete(f); }
   };
 })();

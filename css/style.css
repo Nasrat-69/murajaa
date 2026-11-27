@@ -764,3 +764,14 @@ body.call-on .main { padding-bottom: 340px; }
 .qask b .ar, .ask b .ar { color: inherit; font-size: 1.5rem; line-height: 1.5; }
 .qask.sm b .ar { font-size: 1.25rem; }
 .ptabs.live { margin-top: 4px; }
+
+/* ===== Onglet À revoir ===== */
+.topnav button, .tabs button { position: relative; }
+.navn { font-style: normal; background: var(--bad); color: #fff; font-size: .64rem; font-weight: 800; border-radius: 999px; padding: 0 5px; min-width: 16px; line-height: 16px; text-align: center; margin-inline-start: 5px; }
+.tabs button .navn { position: absolute; top: 2px; inset-inline-end: calc(50% - 22px); margin: 0; }
+.wlist { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px; margin-top: 10px; }
+.witem { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 4px 6px 4px 10px; background: var(--surface); }
+.witem .ar { flex: none; } .witem .small { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.witem .icon { flex: none; width: 30px; height: 30px; color: var(--muted); } .witem .icon:hover { color: var(--good); }
+.witem .icon .ic { width: 16px; height: 16px; }
+.sec .ar { font-size: 1.15rem; }

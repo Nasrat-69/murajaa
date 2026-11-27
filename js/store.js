@@ -134,6 +134,8 @@ const Store = (() => {
   // résultat d'examen / jeu : statistiques + une erreur ramène le mot en révision
   // « À revoir » / « Difficile » : le mot va dans la liste des mots difficiles
   function markHard(itemId) { const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 }); r.err++; save(); }
+  // « je le sais maintenant » : le mot sort de la liste des mots à revoir
+  function clearWeak(itemId) { const r = S.items[itemId]; if (r) { r.ok = Math.max(r.ok, r.err * 2); save(); } }
   function markOk(itemId) { const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 }); r.ok++; save(); }
   function answer(itemId, ok) {
     const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 });
@@ -149,6 +151,6 @@ const Store = (() => {
   load();
   return {
     get S() { return S; }, set S(v) { S = v; }, set onSave(f) { onSave = f; },
-    save, saveNow, load, defaults, normalize, merge, replace, today, addXP, streak, bestStreak, level, newToday, grade, preview, answer, markHard, markOk, KEY
+    save, saveNow, load, defaults, normalize, merge, replace, today, addXP, streak, bestStreak, level, newToday, grade, preview, answer, markHard, markOk, clearWeak, KEY
   };
 })();

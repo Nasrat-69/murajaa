@@ -82,7 +82,7 @@
 
   /* ---------- rendu ---------- */
   const SESSION = ['flash', 'exam', 'paper', 'rush', 'tf', 'rain', 'anagram', 'live'];
-  const NAV = [['home', 'home', 'Accueil'], ['reviewSetup', 'cards', 'Réviser'], ['examSetup', 'exam', 'Examen'], ['games', 'game', 'Jeux'], ['words', 'book', 'Mots']];
+  const NAV = [['home', 'home', 'Accueil'], ['reviewSetup', 'cards', 'Réviser'], ['missed', 'target', 'À revoir'], ['examSetup', 'exam', 'Examen'], ['games', 'game', 'Jeux'], ['words', 'book', 'Mots']];
   function render() {
     setTimeout(() => window.dispatchEvent(new Event('murajaa:render')), 0);
     // garde ce qui est en cours de saisie (utile quand l'adversaire répond pendant qu'on écrit)
@@ -103,7 +103,7 @@
     const L = Store.level(), u = Cloud.st.user;
     return `<header class="top"><div class="top-in">
       <button class="brand" data-a="go" data-to="home"><span class="logo">م</span><span class="brand-t">Murājaʿa</span></button>
-      <nav class="topnav">${NAV.map(([v, , l]) => `<button data-a="go" data-to="${v}" class="${navCur() === v ? 'on' : ''}">${l}</button>`).join('')}</nav>
+      <nav class="topnav">${NAV.map(([v, , l]) => `<button data-a="go" data-to="${v}" class="${navCur() === v ? 'on' : ''}">${l}${navBadge(v)}</button>`).join('')}</nav>
       <div class="hud">
         <span class="pill" data-tip="Jours de suite">${ico('flame', 'fire')}${Store.streak()}</span>
         <span class="pill" data-tip="${S().xp} XP · encore ${L.next} XP pour le niveau ${L.lvl + 1}">${ico('star', 'gold')}${L.lvl}</span>
@@ -112,8 +112,20 @@
         <button class="avbtn" data-a="go" data-to="account" aria-label="Mon compte">${u ? avatar({ name: S().name || u.displayName, photo: u.photoURL }) : `<span class="av ghost">${ico('user')}</span>`}</button>
       </div></div></header>`;
   }
+  // tous les mots ratés pas encore rattrapés, rangés par niveau puis par texte (mots du livre et mots perso)
+  function weakByLesson(decks = centerDecks()) {
+    const seen = new Set(), out = [];
+    for (const d of decks) for (const l of d.lessons) {
+      const a = Engine.weakItems(l.items).filter(it => !seen.has(it.id));
+      a.forEach(it => seen.add(it.id));
+      if (a.length) out.push({ d, l, items: a });
+    }
+    return out;
+  }
+  const weakCount = () => weakByLesson().reduce((a, g) => a + g.items.length, 0);
+  const navBadge = v => { if (v !== 'missed') return ''; const n = weakCount(); return n ? `<em class="navn">${n > 99 ? '99+' : n}</em>` : ''; };
   function nav() {
-    return `<nav class="tabs">${NAV.map(([v, i, l]) => `<button data-a="go" data-to="${v}" class="${navCur() === v ? 'on' : ''}">${ico(i)}<span>${l}</span></button>`).join('')}</nav>`;
+    return `<nav class="tabs">${NAV.map(([v, i, l]) => `<button data-a="go" data-to="${v}" class="${navCur() === v ? 'on' : ''}">${ico(i)}<span>${l}</span>${navBadge(v)}</button>`).join('')}</nav>`;
   }
   function sessionTop(i, n, extra = '') {
     return `<div class="stop"><button class="icon quit" data-a="quit" aria-label="Quitter">${ico('x')}</button>
@@ -899,8 +911,42 @@
   const isOral = m => m === 'oral' || m === 'speed';
   const SPEED_T = [[5, '5 s'], [8, '8 s'], [10, '10 s'], [15, '15 s'], [20, '20 s']];
   // cartes du duel : choisies par l'hôte (mêmes réglages que Réviser), puis envoyées par identifiant à l'adversaire
+  // mots ratés que je mets dans la partie : ceux des textes que je n'ai pas décochés
+  function myWeak() {
+    const x = new Set(S().live.wx || []);
+    const groups = weakByLesson(LIB.decks.filter(d => !d.user)).map(g => Object.assign({ on: !x.has(g.l.id) }, g));
+    const on = groups.filter(g => g.on);
+    return { groups, ids: [...new Set(on.flatMap(g => g.items.map(it => it.id)))], l: on.map(g => g.l.id) };
+  }
+  // chacun envoie ses mots ratés à la salle
+  function pushMyWeak(force) {
+    if (V.name !== 'live' || !V.room || V.room.state !== 'lobby' || V.room.settings.src !== 'missed') return;
+    const w = myWeak(), cur = (V.room.players[Cloud.uid()] || {}).weak, val = { ids: w.ids, l: w.l };
+    if (!force && cur && JSON.stringify(cur) === JSON.stringify(val)) return;
+    if (!force && V.weakSent === JSON.stringify(val)) return;
+    V.weakSent = JSON.stringify(val);
+    Cloud.setWeak(V.code, val).catch(console.warn);
+  }
+  function withWeak(st) {
+    if (st.src !== 'missed') { delete st.ids; return st; }
+    const ws = Object.values(V.room.players).map(p => p.weak).filter(Boolean);
+    const mine = myWeak(); ws.push({ ids: mine.ids, l: mine.l });
+    st.ids = [...new Set(ws.flatMap(w => w.ids || []))];
+    st.l = [...new Set(ws.flatMap(w => w.l || []))];
+    return st;
+  }
+  function myWeakPanel(r) {
+    const w = myWeak(), o = r && opp(), ow = o && o.weak;
+    const both = r ? new Set([...w.ids, ...((ow && ow.ids) || [])]).size : w.ids.length;
+    return `<section class="panel missed"><h2>${ico('target', 'red')} Tes mots ratés pour ce duel</h2>
+      ${w.groups.length ? `<p class="muted small">Décoche les textes que tu ne veux pas mettre dans la partie.</p>
+        <div class="pchips">${w.groups.map(g => `<button class="pchip ${g.on ? 'on' : ''}" data-a="myWeakTog" data-id="${esc(g.l.id)}"><span>${esc(g.l.title)}</span><small>${g.items.length}</small></button>`).join('')}</div>`
+        : '<p class="muted small">Tu n\u2019as aucun mot raté pour l\u2019instant.</p>'}
+      <p class="small"><b>Toi : ${w.ids.length}</b>${r ? ` · ${o ? `<b>${esc(o.name)} : ${ow ? ow.ids.length : '…'}</b>` : 'en attente de ton binôme'} · <b>Ensemble : ${both} mots</b>` : ''}</p></section>`;
+  }
   function liveCardList(st) {
-    const items = Engine.itemsFor(st.l).filter(it => !it.custom && !(LIB.decks.find(d => d.id === it.deckId) || {}).user);
+    let items = Engine.itemsFor(st.l).filter(it => !it.custom && !(LIB.decks.find(d => d.id === it.deckId) || {}).user);
+    if (st.ids) { const ids = new Set(st.ids); items = items.filter(it => ids.has(it.id)); st = Object.assign({}, st, { which: 'all' }); }
     const pickList = what => {
       let l = Engine.selectCards(Engine.cards(items, { what, dir: st.dir }), st.which || 'all');
       if ((st.which || 'all') !== 'due' && st.order !== 'book') l = Engine.shuffle(l);
@@ -913,12 +959,15 @@
   }
   // réglages du duel : les mêmes à la création et dans la salle d'attente (pour l'hôte)
   function liveSetupPanels(l, cnt) {
-    return `<section class="panel"><h2 class="step"><i>1</i>Quels textes ?</h2>${picker()}</section>
+    const src = l.src || 'texts';
+    return `<section class="panel"><h2 class="step"><i>1</i>Quels mots ?</h2>
+        ${seg('liveOpt', 'src', [['texts', 'Les textes choisis'], ['missed', 'Nos mots ratés (à tous les deux)']], src)}
+        ${src === 'missed' ? `<p class="muted small">La partie mélange tes mots ratés et ceux de ton binôme. Chacun choisit les siens${V.name === 'live' ? ' dans l\u2019encadré au-dessus' : ' (toi ci-dessous, lui en rejoignant la salle)'}.</p>${V.name === 'live' ? '' : myWeakPanel(null)}` : picker()}</section>
       <section class="panel"><h2 class="step"><i>2</i>Type de question</h2>${whatChips(l.what, 'liveWhat')}
         <h3>Sens</h3>${seg('liveOpt', 'dir', [['ar', 'Arabe → Français'], ['fr', 'Français → Arabe'], ['both', 'Les deux']], l.dir)}</section>
       <section class="panel"><h2 class="step"><i>3</i>Quelles cartes ?</h2>
-        <div class="which">${WHICH.map(([k, t, d]) => `<button class="whc ${l.which === k ? 'on' : ''} ${cnt[k] ? '' : 'empty'}" data-a="liveOpt" data-k="which" data-v="${k}"><b>${t}</b><span class="whn">${cnt[k]}</span><small>${d}</small></button>`).join('')}</div>
-        <p class="muted small">Ce sont tes cartes (ta progression) qui servent à choisir les questions ; ton binôme reçoit exactement les mêmes.</p>
+        ${src === 'missed' ? '' : `<div class="which">${WHICH.map(([k, t, d]) => `<button class="whc ${l.which === k ? 'on' : ''} ${cnt[k] ? '' : 'empty'}" data-a="liveOpt" data-k="which" data-v="${k}"><b>${t}</b><span class="whn">${cnt[k]}</span><small>${d}</small></button>`).join('')}</div>
+        <p class="muted small">Ce sont tes cartes (ta progression) qui servent à choisir les questions ; ton binôme reçoit exactement les mêmes.</p>`}
         <h3>Organisation</h3>${seg('liveOpt', 'parts', [['mix', 'Tout mélangé'], ['parts', 'Par parties, comme l’examen']], l.parts || 'mix')}
         ${l.parts === 'parts' ? '<p class="muted small">Une partie par type de question coché (traduction, conjugaison, pluriel…), l\u2019une après l\u2019autre. Coche plusieurs types à l\u2019étape 2.</p>' : ''}
         <h3>Ordre des mots</h3>${seg('liveOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], l.order)}
@@ -940,7 +989,7 @@
     lobbySyncT = setTimeout(() => {
       if (V.name !== 'live' || !V.room || V.room.state !== 'lobby') return;
       const l = S().live;
-      Cloud.updateSettings(V.code, Object.assign({}, V.room.settings, { l: sel(), n: l.n, mode: l.mode, time: l.time, adv: l.adv, what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order, parts: l.parts || 'mix' }))
+      Cloud.updateSettings(V.code, Object.assign({}, V.room.settings, { l: sel(), n: l.n, mode: l.mode, time: l.time, adv: l.adv, what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order, parts: l.parts || 'mix', src: l.src || 'texts' }))
         .catch(e => toast(e.message));
     }, 350);
   }
@@ -949,13 +998,14 @@
     if (gate) return gate;
     const l = S().live;
     const cards = Engine.cards(Engine.itemsFor(sel()), l), cnt = Engine.countWhich(cards);
-    const n = liveCardList(Object.assign({}, l, { l: sel() })).length;
+    const mw = (l.src || 'texts') === 'missed' ? myWeak() : null;
+    const n = liveCardList(Object.assign({}, l, mw ? { l: mw.l, ids: mw.ids } : { l: sel() })).length;
     return `<section class="panel"><h2>Rejoindre une salle</h2>
         <div class="row"><input id="liveCode" class="codein" placeholder="CODE" maxlength="5" value="${esc(V.joinCode || '')}" autocapitalize="characters"><button class="btn primary" data-a="liveJoin">Rejoindre</button></div></section>
       <h2 class="sec">Créer une salle</h2>
       ${liveSetupPanels(l, cnt)}
       <div class="cta-bar"><div class="cta-info"><b>${n}</b> question${n > 1 ? 's' : ''}<small>${esc(WHICH.find(w => w[0] === l.which)[1])} · ${cards.length} au total</small></div>
-        <button class="btn primary lg" data-a="liveCreate" ${n ? '' : 'disabled'}>Créer la salle</button></div>`;
+        <button class="btn primary lg" data-a="liveCreate" ${n || l.src === 'missed' ? '' : 'disabled'}>Créer la salle</button></div>`;
   }
 
   /* ----- Duel en direct ----- */
@@ -1026,7 +1076,7 @@
         later(() => { if (V.room && !V.room.paused && V.room.qi === qi) Cloud.advanceFrom(V.code, qi, V.qs.length).catch(console.warn); else V.advFor = null; }, st.mode === 'speed' ? 900 : 3500);
       }
     }
-    if (data.state === 'lobby') { V.qs = null; V.qi = null; V.recorded = false; V.advFor = null; V.revealFor = null; V.paused = null; V.celebrated = false; }
+    if (data.state === 'lobby') { later(() => pushMyWeak(false), 0); V.qs = null; V.qi = null; V.recorded = false; V.advFor = null; V.revealFor = null; V.paused = null; V.celebrated = false; }
     if (data.state === 'done') recordLive(data);
     render();
   }
@@ -1095,9 +1145,10 @@
           ${location.protocol.startsWith('http') ? `<button class="btn sm" data-a="copy" data-text="${esc(location.origin + location.pathname + '#live=' + V.code)}">${ico('link')}Copier le lien</button>` : ''}</div>
           <p class="muted small">${ico('headset')} Rejoignez le salon vocal en bas de l'écran pour vous parler pendant la partie.</p></section>
         ${scoreboard(r)}
+        ${st.src === 'missed' ? myWeakPanel(r) : ''}
         ${missedPanel(missedItems(), 'Mes mots ratés dans cette salle')}
         <section class="panel"><h3>Réglages de la partie</h3>
-          <p class="small">${words} mots · ${st.n === 'all' ? 'toutes les' : st.n} questions${st.what ? ' · ' + Object.keys(CATS).filter(k => st.what[k]).map(k => CATS[k].label).join(', ') : ''}${st.parts === 'parts' ? ' · par parties' : ''} · ${st.mode === 'qcm' ? 'choix multiples' : st.mode === 'oral' ? 'à l\'oral, chacun son tour' : st.mode === 'speed' ? 'oral chrono, une manche chacun' : 'à écrire'}${isOral(st.mode) ? '' : ` · ${st.time} s par question`} · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
+          <p class="small">${st.src === 'missed' ? 'Nos mots ratés' : words + ' mots'} · ${st.n === 'all' ? 'toutes les' : st.n} questions${st.what ? ' · ' + Object.keys(CATS).filter(k => st.what[k]).map(k => CATS[k].label).join(', ') : ''}${st.parts === 'parts' ? ' · par parties' : ''} · ${st.mode === 'qcm' ? 'choix multiples' : st.mode === 'oral' ? 'à l\'oral, chacun son tour' : st.mode === 'speed' ? 'oral chrono, une manche chacun' : 'à écrire'}${isOral(st.mode) ? '' : ` · ${st.time} s par question`} · ${st.adv === 'manual' ? 'bouton « Suivant »' : 'passage automatique'}</p>
           ${missing.length ? `<p class="warn">Il te manque des leçons de cette partie (mets l'appli à jour).</p>` : ''}
           ${isHost() ? '<p class="muted small">Change les textes, le niveau ou le type de questions ci-dessous : ton binôme voit les nouveaux réglages tout de suite.</p>' : "<p class='muted small'>L'hôte choisit les réglages.</p>"}</section>
         ${isHost() ? (() => { const l = S().live, cards = Engine.cards(Engine.itemsFor(sel()), l); return liveSetupPanels(l, Engine.countWhich(cards)); })() : ''}
@@ -1396,6 +1447,19 @@
     const ids = raw ? raw.items.map((it, i) => it.id || `${L.id}:${i}`) : [];
     return ids.concat((Cloud.base.added[L.id] || []).map(it => it.id)).filter(id => S().hidden[id]);
   };
+  VIEWS.missed = () => {
+    const groups = weakByLesson(), total = groups.reduce((a, g) => a + g.items.length, 0);
+    if (!total) return `<div class="page-h"><h1>À revoir</h1></div><div class="done">${doneIcon('check', 'ok')}<h1>Aucun mot à revoir</h1><p class="muted">Les mots que tu rates (révision, examen, jeux, duel) arrivent ici tout de suite. Ils en sortent quand tu les réussis à nouveau.</p></div>`;
+    const decks = [...new Set(groups.map(g => g.d))];
+    return `<div class="page-h"><h1>À revoir</h1><p class="muted">Tous les mots que tu as ratés, en révision, à l'examen, dans les jeux ou en duel. Un mot sort de la liste quand tu le réussis à nouveau.</p></div>
+      <section class="panel"><div class="row between wrap"><h2>${ico('target', 'red')} ${total} mot${total > 1 ? 's' : ''} à revoir</h2>
+        <div class="row wrap"><button class="btn primary" data-a="weakCram" data-id="">${ico('zap')}Réviser tout</button><button class="btn" data-a="weakDrill" data-id="">${ico('exam')}Tout sur chaque mot</button></div></div></section>
+      ${decks.map(d => `<h2 class="sec">${ar(d.title, 'sm')} <small class="muted">${esc(d.subtitle || '')}</small></h2>
+        ${groups.filter(g => g.d === d).map(g => `<section class="panel wlesson"><div class="row between wrap"><div><b>${esc(g.l.title)}</b> <small class="koc">${g.items.length} à revoir</small></div>
+          <div class="row wrap"><button class="btn sm" data-a="weakCram" data-id="${esc(g.l.id)}">${ico('zap')}Réviser</button><button class="btn sm ghost" data-a="weakDrill" data-id="${esc(g.l.id)}">${ico('exam')}Tout sur chaque mot</button></div></div>
+          <div class="wlist">${g.items.map(it => `<div class="witem">${ar(Engine.head(it), 'md')}<span class="muted small">${esc(it.fr || '')}</span><button class="icon sm" data-a="weakDone" data-id="${esc(it.id)}" data-tip="Je le sais maintenant : retirer de la liste" aria-label="Retirer">${ico('check')}</button></div>`).join('')}</div></section>`).join('')}`).join('')}`;
+  };
+  const weakOf = lid => (lid ? weakByLesson().filter(g => g.l.id === lid) : weakByLesson()).flatMap(g => g.items);
   VIEWS.words = () => {
     if (V.lesson && LIB.lessons[V.lesson]) return lessonView();
     const decks = centerDecks(), base = decks.filter(d => !d.user), mine = decks.filter(d => d.user);
@@ -1668,7 +1732,7 @@
     liveCreate: async b => {
       b.disabled = true;
       const l = S().live;
-      const settings = { l: sel(), n: l.n, mode: l.mode, time: l.time, adv: l.adv, what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order, parts: l.parts || 'mix', h: S().settings.harakat, seed: Math.floor(Math.random() * 2 ** 31) };
+      const settings = { l: sel(), n: l.n, mode: l.mode, time: l.time, adv: l.adv, what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order, parts: l.parts || 'mix', src: l.src || 'texts', h: S().settings.harakat, seed: Math.floor(Math.random() * 2 ** 31) };
       try { const c = await Cloud.createRoom(settings); openLive(c); } catch (e) { b.disabled = false; toast('Erreur : ' + e.message, 4000); }
     },
     liveJoin: async b => {
@@ -1678,9 +1742,9 @@
       try { await Cloud.joinRoom(c); openLive(c); } catch (e) { b.disabled = false; toast(e.message, 4000); }
     },
     liveSet: b => { const st = Object.assign({}, V.room.settings, { [b.dataset.k]: parseV(b.dataset.v) }); if (b.dataset.k === 'mode') st.time = st.mode === 'type' ? 60 : st.mode === 'speed' ? 10 : 30; Cloud.updateSettings(V.code, st); },
-    liveUseSel: () => { const l = S().live; Cloud.updateSettings(V.code, Object.assign({}, V.room.settings, { l: sel(), what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order, parts: l.parts || 'mix' })); },
+    liveUseSel: () => { const l = S().live; Cloud.updateSettings(V.code, Object.assign({}, V.room.settings, { l: sel(), what: Object.assign({}, l.what), dir: l.dir, which: l.which, order: l.order, parts: l.parts || 'mix', src: l.src || 'texts' })); },
     liveStart: () => {
-      const st = Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) });
+      const st = withWeak(Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) }));
       if (st.what) { st.cards = liveCardList(st); if (!st.cards.length) { toast('Aucune carte avec ces réglages. Choisis « Tous les mots » ou d\'autres textes.', 4000); return; } }
       Cloud.updateSettings(V.code, st).then(() => Cloud.startRoom(V.code));
     },
@@ -1707,7 +1771,7 @@
       Cloud.judge(V.code, V.qi, roles.ans, { ok, n: ok ? q.hidden.length : 0, pts, ms, oral: true })
         .then(() => (ok ? FX.sound.ok() : FX.sound.bad())).catch(e => { V.judging = null; toast(e.message); });
     },
-    liveRematch: () => { const st = Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) }); if (st.what) st.cards = liveCardList(st); Cloud.rematch(V.code, st); },
+    liveRematch: () => { const st = withWeak(Object.assign({}, V.room.settings, { seed: Math.floor(Math.random() * 2 ** 31) })); if (st.what) st.cards = liveCardList(st); Cloud.rematch(V.code, st); },
     liveQuit: () => { if (V.room && V.room.state === 'playing' && !confirm('Quitter la partie en cours ?')) return; history.replaceState(null, '', location.pathname); go('duel', { tab: 'live' }); },
     livePause: () => { if (!V.room || V.paused) return; Cloud.pause(V.code, V.qi, liveLim() - (Date.now() - V.t0)).catch(e => toast(e.message)); },
     liveResume: () => Cloud.resume(V.code).catch(e => toast(e.message)),
@@ -1734,6 +1798,14 @@
     },
     planRedo: b => { const s = V.result.secs.find(x => x.key === b.dataset.k); const items = [...new Set(s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id]).filter(Boolean))]; const dr = V.drill; V.done = false; if (dr) startDrill(items, [s.key]); else startPaper(items, { sections: [s.key], size: 'all' }); },
     redoWrong: () => { const items = [...new Set(V.result.secs.flatMap(s => s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id])).filter(Boolean))]; const secs = V.result.secs.filter(s => s.pct < 1).map(s => s.key); const dr = V.drill; V.done = false; if (dr) startDrill(items, secs); else startPaper(items, { sections: secs, size: 'all' }); },
+    weakCram: b => {
+      const list = Engine.shuffle(Engine.cards(weakOf(b.dataset.id), { dir: 'both', what: { tr: true, conj: true, pl: true, ant: true, syn: true, prep: true } }));
+      if (!list.length) { toast('Rien à réviser ici'); return; }
+      go('flash', { mode: 'cram', q: list, i: 0, flip: false, n: 0, xp: 0, total: list.length, known: 0, unknown: 0, seen: {} });
+    },
+    weakDrill: b => startDrill(weakOf(b.dataset.id), Object.keys(Engine.DRILL)),
+    weakDone: b => { Store.clearWeak(b.dataset.id); FX.sound.ok(); render(); },
+    myWeakTog: b => { const x = S().live.wx = S().live.wx || [], id = b.dataset.id, i = x.indexOf(id); if (i >= 0) x.splice(i, 1); else x.push(id); Store.save(); FX.sound.tap(); render(); pushMyWeak(true); },
     togWeak: b => { const id = b.dataset.id; WOPEN.has(id) ? WOPEN.delete(id) : WOPEN.add(id); FX.sound.tap(); render(); },
     reviseWeak: b => {
       const d = centerDecks().find(x => x.id === b.dataset.id); if (!d) return;
