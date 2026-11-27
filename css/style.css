@@ -775,3 +775,6 @@ body.call-on .main { padding-bottom: 340px; }
 .witem .icon { flex: none; width: 30px; height: 30px; color: var(--muted); } .witem .icon:hover { color: var(--good); }
 .witem .icon .ic { width: 16px; height: 16px; }
 .sec .ar { font-size: 1.15rem; }
+
+.oral-mask.tap { width: 100%; cursor: pointer; font: inherit; }
+.oral-mask.tap:hover { border-color: var(--primary); color: var(--primary); }
