@@ -563,11 +563,11 @@ details { border-bottom: 1px solid var(--line); padding: 6px 0; } summary { curs
 /* ===== Examen blanc ===== */
 .ptabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 10px; scrollbar-width: none; }
 .ptabs::-webkit-scrollbar { display: none; }
-.ptabs button { flex: none; display: flex; align-items: center; gap: 6px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 6px 10px; font-size: .84rem; font-weight: 600; }
-.ptabs button b { width: 20px; height: 20px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-size: .72rem; }
-.ptabs button small { color: var(--muted); }
-.ptabs button.on { border-color: var(--primary); background: var(--primary-soft); } .ptabs button.on b { background: var(--primary); color: #fff; }
-.ptabs button.full b { background: var(--good); color: #fff; }
+.ptabs button, .ptabs .pt { flex: none; display: flex; align-items: center; gap: 6px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 6px 10px; font-size: .84rem; font-weight: 600; }
+.ptabs button b, .ptabs .pt b { width: 20px; height: 20px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; font-size: .72rem; }
+.ptabs button small, .ptabs .pt small { color: var(--muted); }
+.ptabs button.on, .ptabs .pt.on { border-color: var(--primary); background: var(--primary-soft); } .ptabs button.on b, .ptabs .pt.on b { background: var(--primary); color: #fff; }
+.ptabs button.full b, .ptabs .pt.full b { background: var(--good); color: #fff; }
 .paper { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 6px 18px 10px; box-shadow: var(--shadow); }
 .ph { border-bottom: 1px dashed var(--line-2); padding: 12px 0; margin-bottom: 4px; }
 .ph h2 { margin: 2px 0; } .pnum { font-size: .72rem; font-weight: 800; color: var(--primary); text-transform: uppercase; letter-spacing: .08em; }
@@ -759,3 +759,8 @@ body.call-on .main { padding-bottom: 340px; }
 .wgrp .chips { margin-top: 4px; }
 .mode.wide { grid-column: 1 / -1; border-style: dashed; }
 .mode.wide.on { border-style: solid; }
+
+/* consigne en arabe dans la pastille */
+.qask b .ar, .ask b .ar { color: inherit; font-size: 1.5rem; line-height: 1.5; }
+.qask.sm b .ar { font-size: 1.25rem; }
+.ptabs.live { margin-top: 4px; }

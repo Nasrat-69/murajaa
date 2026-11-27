@@ -1,6 +1,12 @@
 /* Traductions de l'interface : [français, anglais, russe]. {n} = un nombre. */
 (() => {
   const T = [
+    ["Organisation", "Layout", "Порядок"],
+    ["Tout mélangé", "All mixed", "Всё вперемешку"],
+    ["Par parties, comme l’examen", "In sections, like the exam", "По разделам, как на экзамене"],
+    ["Une partie par type de question coché (traduction, conjugaison, pluriel…), l’une après l’autre. Coche plusieurs types à l’étape 2.", "One section per ticked question type (translation, conjugation, plural…), one after the other. Tick several types in step 2.", "Один раздел на каждый отмеченный тип вопроса, один за другим. Отметь несколько типов на шаге 2."],
+    ["Questions par partie", "Questions per section", "Вопросов в разделе"],
+    [" · par parties", " · in sections", " · по разделам"],
     ["{n} mot à revoir", "{n} word to review", "{n} слово на повторение"],
     ["{n} mots à revoir", "{n} words to review", "Слов на повторение: {n}"],
     ["{n} à revoir", "{n} to review", "на повторение: {n}"],
