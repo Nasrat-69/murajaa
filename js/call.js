@@ -2,16 +2,28 @@
    L'hôte de la salle lance l'appel dès que les deux joueurs l'ont rejoint. */
 const Call = (() => {
   // STUN : trouve l'adresse publique. TURN (relais) : indispensable quand l'un des deux est en 4G/5G ou derrière un réseau strict.
-  // window.TURN_SERVERS (dans js/config.js) permet de mettre ses propres relais.
-  const ICE = { iceServers: [
-    { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
-    ...(window.TURN_SERVERS || [{ urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' }])
-  ] };
+  // js/config.js peut fournir window.TURN_API (adresse qui renvoie la liste des relais, ex. Metered) ou window.TURN_SERVERS.
+  const STUN = { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] };
+  const FREE_TURN = [
+    { urls: ['turn:freestun.net:3478', 'turns:freestun.net:5349'], username: 'free', credential: 'free' },
+    { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turn:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' }
+  ];
+  let iceCache = null;
+  async function iceConfig() {
+    if (iceCache && Date.now() - iceCache.at < 3600e3) return iceCache.cfg;
+    let turn = window.TURN_SERVERS || null;
+    if (!turn && window.TURN_API) {
+      try { const r = await fetch(window.TURN_API, { cache: 'no-store' }); if (r.ok) turn = await r.json(); } catch (e) { warn(e); }
+    }
+    const cfg = { iceServers: [STUN, ...((turn && turn.length) ? turn : FREE_TURN)] };
+    iceCache = { at: Date.now(), cfg };
+    return cfg;
+  }
   const el = document.getElementById('call');
   const st = {
     code: null, room: null, joined: false, mic: true, cam: false, local: null, camTrack: null, pc: null, sid: null,
     remote: null, unsub: null, seen: new Set(), pending: [], outbox: [], docReady: false, status: 'idle', min: false,
-    videoSender: null, meters: {}, raf: null, ac: null, err: null, joining: false
+    videoSender: null, meters: {}, raf: null, ac: null, err: null, joining: false, route: '', retries: 0
   };
   const warn = e => console.warn('[appel]', e);
   const uid = () => Cloud.uid();
@@ -42,8 +54,8 @@ const Call = (() => {
   }
 
   /* ---- WebRTC ---- */
-  function newPc() {
-    const pc = new RTCPeerConnection(ICE);
+  function newPc(cfg) {
+    const pc = new RTCPeerConnection(cfg);
     pc.onicecandidate = e => { if (e.candidate) sendCand(JSON.stringify(e.candidate.toJSON())); };
     pc.ontrack = e => {
       if (!st.remote) st.remote = new MediaStream();
@@ -54,12 +66,26 @@ const Call = (() => {
       bindMedia(); meter('them', st.remote); render();
     };
     pc.onconnectionstatechange = () => {
-      st.status = pc.connectionState; render();
-      if (pc.connectionState === 'connected') st.retries = 0;
-      // échec : l'hôte relance l'appel (2 fois maximum)
-      if (pc.connectionState === 'failed' && isHost() && (st.retries || 0) < 2) { st.retries = (st.retries || 0) + 1; setTimeout(() => { if (st.pc === pc) makeOffer().catch(warn); }, 1500); }
+      st.status = pc.connectionState;
+      if (pc.connectionState === 'connected') { st.retries = 0; st.route = ''; routeOf(pc).then(r => { st.route = r; render(); }); }
+      // échec : l'hôte relance l'appel (2 fois maximum), puis on explique le problème
+      if (pc.connectionState === 'failed') {
+        if (isHost() && st.retries < 2) { st.retries++; setTimeout(() => { if (st.pc === pc) makeOffer().catch(warn); }, 1500); }
+        else if (st.retries >= 2 || !isHost()) st.status = 'blocked';
+      }
+      render();
     };
     return pc;
+  }
+  // connexion directe ou par le relais ? (affiché dans le salon pour comprendre les problèmes)
+  async function routeOf(pc) {
+    try {
+      const stats = await pc.getStats(); let pair = null; const by = {};
+      stats.forEach(r => { by[r.id] = r; if (r.type === 'transport' && r.selectedCandidatePairId) pair = r.selectedCandidatePairId; });
+      if (!pair) stats.forEach(r => { if (r.type === 'candidate-pair' && (r.selected || r.nominated) && r.state === 'succeeded') pair = r.id; });
+      const p = by[pair], l = p && by[p.localCandidateId], rm = p && by[p.remoteCandidateId];
+      return (l && l.candidateType === 'relay') || (rm && rm.candidateType === 'relay') ? 'relais' : 'direct';
+    } catch (e) { return ''; }
   }
   function sendCand(s) {
     if (!st.docReady) { st.outbox.push(s); return; }
@@ -72,8 +98,9 @@ const Call = (() => {
     stopMeter('them'); st.status = st.joined ? 'waiting' : 'idle';
   }
   async function makeOffer() {
+    const cfg = await iceConfig();
     closePc();
-    const pc = st.pc = newPc();
+    const pc = st.pc = newPc(cfg);
     st.sid = Math.random().toString(36).slice(2); st.status = 'connecting';
     st.local.getAudioTracks().forEach(t => pc.addTrack(t, st.local));
     const vt = pc.addTransceiver('video', { direction: 'sendrecv' });
@@ -84,9 +111,11 @@ const Call = (() => {
     st.outbox = []; st.docReady = true;
   }
   async function answerOffer(d) {
+    st.sid = d.sid;
+    const cfg = await iceConfig();
     closePc();
     st.sid = d.sid; st.docReady = true; st.status = 'connecting';
-    const pc = st.pc = newPc();
+    const pc = st.pc = newPc(cfg);
     await pc.setRemoteDescription(d.offer);
     st.local.getAudioTracks().forEach(t => pc.addTrack(t, st.local));
     const vt = pc.getTransceivers().find(t => t.receiver && t.receiver.track && t.receiver.track.kind === 'video');
@@ -114,7 +143,7 @@ const Call = (() => {
     st.joining = true; st.err = null; render();
     try { st.local = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }); }
     catch (e) { st.joining = false; st.err = 'Micro refusé : autorise le micro dans ton navigateur.'; render(); return; }
-    st.joined = true; st.joining = false; st.mic = true; st.status = 'waiting';
+    st.joined = true; st.joining = false; st.mic = true; st.status = 'waiting'; st.retries = 0;
     unlockAudio();
     meter('me', st.local);
     await Cloud.setCall(st.code, { mic: true, cam: false }).catch(warn);
@@ -198,7 +227,7 @@ const Call = (() => {
     if (!st.joined) return members()[o] ? `${esc(p.name)} est dans le salon` : 'Personne dans le salon';
     if (!o) return 'En attente de ton binôme';
     if (!members()[o]) return `En attente de ${esc(p.name)}…`;
-    return { connecting: 'Connexion…', new: 'Connexion…', connected: 'Connecté', disconnected: 'Connexion instable…', failed: 'Échec de connexion, nouvel essai…', waiting: 'Connexion…' }[st.status] || 'Connexion…';
+    return { connecting: 'Connexion…', new: 'Connexion…', connected: st.route === 'relais' ? 'Connecté (par relais)' : st.route === 'direct' ? 'Connecté (direct)' : 'Connecté', disconnected: 'Connexion instable…', failed: 'Échec de connexion, nouvel essai…', blocked: 'Vos réseaux bloquent l’appel : essayez en Wi-Fi, ou quittez et rejoignez le salon', waiting: 'Connexion…' }[st.status] || 'Connexion…';
   }
   function render() {
     if (!st.code || !st.room) return;

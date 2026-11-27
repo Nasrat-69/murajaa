@@ -225,10 +225,12 @@ const Engine = (() => {
     return n ? s / Math.max(n, Math.min(ks.length, 2)) : 0;
   }
   const lessonMastery = L => (L.items.length ? L.items.reduce((a, it) => a + mastery(it), 0) / L.items.length : 0);
+  // mot « à revoir » : raté plus souvent qu'il n'a été réussi depuis
+  const weakScore = it => { const r = S().items[it.id]; return r && r.err > 0 ? r.err - r.ok * 0.5 : 0; };
+  const weakItems = items => items.filter(it => weakScore(it) > 0);
   function enemies(n = 8) {
-    return Object.values(LIB.items).map(it => {
-      const r = S().items[it.id]; return { it, score: r ? r.err - r.ok * 0.5 : 0, err: r ? r.err : 0 };
-    }).filter(x => x.err > 0 && x.score > 0).sort((a, b) => b.score - a.score).slice(0, n).map(x => x.it);
+    return Object.values(LIB.items).map(it => ({ it, score: weakScore(it) }))
+      .filter(x => x.score > 0).sort((a, b) => b.score - a.score).slice(0, n).map(x => x.it);
   }
 
   /* ---- aléatoire ---- */
@@ -436,6 +438,46 @@ const Engine = (() => {
     return out;
   }
 
+  /* ---- « Tout sur chaque mot » : chaque mot est interrogé sur tout ce qu'il a, partie par partie ---- */
+  const DRILL = {
+    tr: { title: 'Traduction', desc: 'Donne le sens de chaque mot.' },
+    conj: { title: 'Conjugaison', desc: 'Complète le tableau : passé, présent, impératif, masdar.' },
+    pl: { title: 'Pluriels', desc: 'Donne le pluriel de chaque mot.' },
+    ant: { title: 'Contraires', desc: 'Donne le contraire de chaque mot.' },
+    syn: { title: 'Synonymes', desc: 'Donne le synonyme de chaque mot.' },
+    prep: { title: 'Prépositions', desc: 'Quelle préposition (حرف الجر) va avec ce verbe ?' }
+  };
+  function drillPool(key, items, dir, rng) {
+    switch (key) {
+      case 'tr': return items.filter(it => it.fr && head(it)).map(it => {
+        const fr = dir === 'fr' || (dir === 'both' && rng() < 0.5);
+        return fr ? { it, given: 'fr', hidden: [headF(it)] } : { it, given: headF(it), hidden: ['fr'] };
+      });
+      case 'conj': return items.filter(it => it.t === 'verb' && it.mud).map(it => ({ it, given: 'madi', hidden: ['mud', 'amr', 'masdar'].filter(f => it[f]) }));
+      case 'pl': return items.filter(it => it.pl && it.t !== 'verb').map(it => ({ it, given: headF(it), hidden: ['pl'] }));
+      case 'ant': return items.filter(it => it.ant && head(it)).map(it => ({ it, given: headF(it), hidden: ['ant'] }));
+      case 'syn': return items.filter(it => it.syn && head(it)).map(it => ({ it, given: headF(it), hidden: ['syn'] }));
+      case 'prep': return expandPreps(items).filter(it => it.t === 'verb' && it.prep).map(it => ({ it, given: 'madi', hidden: ['prep'] }));
+    }
+    return [];
+  }
+  const drillCount = (key, items) => new Set(drillPool(key, items, 'ar', Math.random).map(x => x.it.vid || x.it.id)).size;
+  function makeDrill(items, { cats, dir = 'ar', order = 'random', rng = Math.random }) {
+    const out = []; let qid = 0;
+    for (const key of Object.keys(DRILL).filter(k => cats.includes(k))) {
+      let pool = drillPool(key, items, dir, rng);
+      if (order !== 'book') pool = shuffle(pool, rng);
+      if (!pool.length) continue;
+      const optPool = key === 'prep' ? expandPreps(items) : items;
+      const qs = pool.map(x => {
+        const opts = {}; x.hidden.forEach(f => { opts[f] = options(x.it, f, optPool, rng); });
+        return { qid: 'q' + (qid++), sec: key, item: x.it, given: x.given, hidden: x.hidden, options: opts };
+      });
+      out.push(Object.assign({ key, qs }, DRILL[key]));
+    }
+    return out;
+  }
+
   /* ---- jeux ---- */
   const PAIRS = {
     tr: [['w', 'fr'], ['fr', 'w'], ['madi', 'fr'], ['fr', 'madi']],
@@ -506,7 +548,7 @@ const Engine = (() => {
 
   return {
     FIELDS, TYPES, CATS, KINDS, PAIRS, CENTERS, SECTIONS, HURUF, build, get LIB() { return LIB; }, head, headF, examFields, itemsFor,
-    parsePreps, expandPreps, spec, cards, catCount, srsQueue, srsStats, selectCards, countWhich, mastery, lessonMastery, enemies,
+    parsePreps, expandPreps, spec, cards, catCount, srsQueue, srsStats, selectCards, countWhich, mastery, lessonMastery, enemies, weakScore, weakItems, DRILL, drillCount, makeDrill,
     rng32, shuffle, bag, options, rootTraps, makeExam, qsFromCards, blankOf, sectionCount, makePaper,
     pairsFor, playable, gameQ, tfQ, anagramQ, enc, dec
   };

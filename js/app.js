@@ -131,7 +131,16 @@
     }).join('')}</div>`;
   }
   // niveaux repliés / dépliés (sélecteur et page Mots)
-  const OPEN = new Set();
+  const OPEN = new Set(), WOPEN = new Set();
+  // mots ratés (pas encore rattrapés) d'un niveau, rangés par texte, dépliables
+  function weakBox(d, wk) {
+    if (!wk.length) return '';
+    const open = WOPEN.has(d.id), ids = new Set(wk.map(it => it.id));
+    const groups = open ? d.lessons.map(l => [l, l.items.filter(it => ids.has(it.id))]).filter(([, a]) => a.length) : [];
+    return `<div class="weakbox ${open ? 'open' : ''}"><div class="weak-h"><button class="weak-tg" data-a="togWeak" data-id="${esc(d.id)}" aria-expanded="${open}">${ico('chevron', 'pchev')}${ico('target')}<b>${wk.length} mot${wk.length > 1 ? 's' : ''} à revoir</b><small>${open ? 'masquer' : 'voir la liste'}</small></button>
+      ${V.name !== 'duel' ? `<button class="btn sm" data-a="reviseWeak" data-id="${esc(d.id)}">${ico('zap')}Réviser</button>` : ''}</div>
+      ${groups.map(([l, a]) => `<div class="wgrp"><small>${esc(l.title)}</small> <small class="koc">${a.length}</small><div class="chips">${a.map(it => `<span class="chip">${ar(Engine.head(it), 'sm')}</span>`).join('')}</div></div>`).join('')}</div>`;
+  }
   const soonRow = soon => soon.length ? `<div class="soonlv"><small class="muted">Bientôt :</small>${soon.map(d => `<span class="soonchip">${ar(d.title, 'sm')}<small>${esc(d.subtitle || '')}</small></span>`).join('')}</div>` : '';
   function picker() {
     const s = S().sel, decks = centerDecks();
@@ -142,12 +151,12 @@
       const ids = d.lessons.map(l => l.id), on = ids.filter(id => s.includes(id)).length;
       const all = ids.length && on === ids.length;
       const words = d.lessons.reduce((a, l) => a + l.items.length, 0);
-      const open = OPEN.has(d.id);
+      const open = OPEN.has(d.id), wk = Engine.weakItems([...new Map(d.lessons.flatMap(l => l.items).map(it => [it.id, it])).values()]);
       return `<div class="pdeck ${on ? 'has' : ''} ${open ? 'open' : ''}">
-        <div class="pdeck-h"><button class="pdeck-tg" data-a="togDeck" data-id="${esc(d.id)}" aria-expanded="${open}">${ico('chevron', 'pchev')}<span class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')} · ${d.lessons.length} textes · ${words} mots</small></span>${on ? `<span class="pcount">${on}</span>` : ''}</button>
+        <div class="pdeck-h"><button class="pdeck-tg" data-a="togDeck" data-id="${esc(d.id)}" aria-expanded="${open}">${ico('chevron', 'pchev')}<span class="pdeck-t">${ar(d.title, 'md')}<small>${esc(d.subtitle || '')} · ${d.lessons.length} textes · ${words} mots${wk.length ? ` · <span class="koc">${wk.length} à revoir</span>` : ''}</small></span>${on ? `<span class="pcount">${on}</span>` : ''}</button>
           <button class="chip-btn ${all ? 'on' : ''}" data-a="selDeck" data-id="${esc(d.id)}">${all ? ico('check') : ''}Tout le niveau</button></div>
         ${open ? `<div class="pchips">${d.lessons.map(l => `<button class="pchip ${s.includes(l.id) ? 'on' : ''}" data-a="selLesson" data-id="${esc(l.id)}">
-          <span>${esc(l.title)}</span><small>${l.items.length}</small></button>`).join('')}</div>` : ''}</div>`;
+          <span>${esc(l.title)}</span><small>${l.items.length}</small>${(n => (n ? `<em class="pweak" data-tip="Mots ratés pas encore rattrapés">${n} à revoir</em>` : ''))(Engine.weakItems(l.items).length)}</button>`).join('')}</div>${weakBox(d, wk)}` : ''}</div>`;
     }).join('')}
     <p class="hint">${none ? 'Rien de coché : tout le centre est inclus.' : `${Engine.itemsFor(sel()).length} mots sélectionnés · <button class="link" data-a="selNone">tout décocher</button>`}</p></div>`;
   }
@@ -242,7 +251,10 @@
     ['flip', 'cards', 'Cartes à retourner', 'Tu retournes la carte puis tu dis si tu savais. L\'appli s\'en sert pour te la reproposer au bon moment.'],
     ['cram', 'zap', 'Je sais / je ne sais pas', 'Glisse la carte à droite si tu sais, à gauche sinon. Elle revient jusqu\'à ce que tu la saches.'],
     ['write', 'pen', 'Écrire', 'Tape la réponse au clavier, la correction est automatique.'],
-    ['qcm', 'choice', 'QCM', 'Choisis la bonne réponse parmi 4 propositions.']];
+    ['qcm', 'choice', 'QCM', 'Choisis la bonne réponse parmi 4 propositions.'],
+    ['full', 'exam', 'Tout sur chaque mot', 'Chaque mot est interrogé sur tout ce qu\u2019il a : sens, conjugaison, pluriel, contraire, synonyme, préposition. Partie par partie, comme l\u2019examen.']];
+  const drillCats = r => Object.keys(Engine.DRILL).filter(k => r.what[k] || ((k === 'ant' || k === 'syn') && r.what[k]));
+  function drillItems(r) { const items = Engine.itemsFor(sel()); return r.fwhich === 'weak' ? Engine.weakItems(items) : items; }
   const WHICH = [
     ['due', 'Programme du jour', 'L\'appli choisit : les mots que tu es en train d\'oublier + quelques nouveaux.'],
     ['all', 'Tous les mots', 'Toute ta sélection, sans exception.'],
@@ -251,7 +263,9 @@
     ['weak', 'En cours', 'Déjà vus mais pas encore bien retenus.'],
     ['known', 'Déjà maîtrisés', 'Pour vérifier qu\'ils sont toujours là.']];
   VIEWS.reviewSetup = () => {
-    const r = S().rev, items = Engine.itemsFor(sel()), cards = Engine.cards(items, r);
+    const r = S().rev;
+    if (r.mode === 'full') return drillSetup(r);
+    const items = Engine.itemsFor(sel()), cards = Engine.cards(items, r);
     const cnt = Engine.countWhich(cards), avail = cnt[r.which] || 0;
     const n = r.which === 'due' || r.n === 'all' ? avail : Math.min(avail, r.n);
     return `<div class="page-h"><h1>Réviser</h1><p class="muted">Tu choisis tout : les textes, le type de question, les cartes et la façon de réviser.</p></div>
@@ -263,13 +277,41 @@
         <div class="which">${WHICH.map(([k, t, d]) => `<button class="whc ${r.which === k ? 'on' : ''} ${cnt[k] ? '' : 'empty'}" data-a="revOpt" data-k="which" data-v="${k}"><b>${t}</b><span class="whn">${cnt[k]}</span><small>${d}</small></button>`).join('')}</div>
         <h3>Ordre des mots</h3>${seg('revOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], r.order)}
         ${r.which !== 'due' ? `<h3>Nombre de cartes</h3>${seg('revOpt', 'n', [[10, '10'], [20, '20'], [40, '40'], ['all', 'Toutes']], r.n)}` : ''}</section>
-      <section class="panel"><h2 class="step"><i>4</i>Comment ?</h2>
-        <div class="modes">${MODES.map(([k, i, t, d]) => `<button class="mode ${r.mode === k ? 'on' : ''}" data-a="revOpt" data-k="mode" data-v="${k}"><span class="mi">${ico(i)}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div></section>
+      ${modesPanel(r)}
       <div class="cta-bar"><div class="cta-info"><b>${n}</b> carte${n > 1 ? 's' : ''}<small>${esc(WHICH.find(w => w[0] === r.which)[1])} · ${cards.length} au total</small></div>
         <button class="btn primary lg" data-a="startRevision" ${n ? '' : 'disabled'}>Commencer</button></div>`;
   };
 
+  const modesPanel = r => `<section class="panel"><h2 class="step"><i>4</i>Comment ?</h2>
+        <div class="modes">${MODES.map(([k, i, t, d]) => `<button class="mode ${r.mode === k ? 'on' : ''} ${k === 'full' ? 'wide' : ''}" data-a="revOpt" data-k="mode" data-v="${k}"><span class="mi">${ico(i)}</span><b>${t}</b><small>${d}</small></button>`).join('')}</div></section>`;
+  function drillSetup(r) {
+    const items = drillItems(r), cats = drillCats(r), all = Engine.itemsFor(sel());
+    const nWeak = Engine.weakItems(all).length;
+    const total = cats.reduce((a, k) => a + Engine.drillCount(k, items), 0);
+    return `<div class="page-h"><h1>Réviser</h1><p class="muted">Tout sur chaque mot : tu es interrogé sur tout ce que chaque mot possède, partie par partie.</p></div>
+      <section class="panel"><h2 class="step"><i>1</i>Quels textes ?</h2>${picker()}</section>
+      <section class="panel"><h2 class="step"><i>2</i>Sur quoi être interrogé ?</h2>
+        <div class="wchips">${Object.entries(Engine.DRILL).map(([k, d]) => {
+          const n = Engine.drillCount(k, items);
+          return `<button class="wchip ${r.what[k] ? 'on' : ''} ${n ? '' : 'empty'}" data-a="revWhat" data-k="${k}">${ico(CAT_ICON[k])}<b>${d.title}</b><small>${n} mot${n > 1 ? 's' : ''}</small><i class="tick">${ico('check')}</i></button>`;
+        }).join('')}</div>
+        <h3>Traduction</h3>${seg('revOpt', 'dir', [['ar', 'Arabe → Français'], ['fr', 'Français → Arabe'], ['both', 'Les deux']], r.dir)}</section>
+      <section class="panel"><h2 class="step"><i>3</i>Quels mots ?</h2>
+        ${seg('revOpt', 'fwhich', [['all', 'Tous les mots'], ['weak', `Mots à revoir (${nWeak})`]], r.fwhich || 'all')}
+        <h3>Réponses</h3>${seg('revOpt', 'ans', [['type', 'À écrire'], ['qcm', 'Choix multiples']], r.ans || 'type')}
+        <h3>Ordre des mots</h3>${seg('revOpt', 'order', [['random', 'Aléatoire'], ['book', 'Ordre du livre']], r.order)}</section>
+      ${modesPanel(r)}
+      <div class="cta-bar"><div class="cta-info"><b>${total}</b> questions<small>${cats.length} partie${cats.length > 1 ? 's' : ''} · ${items.length} mots</small></div>
+        <button class="btn primary lg" data-a="startRevision" ${total ? '' : 'disabled'}>Commencer</button></div>`;
+  }
+  function startDrill(items, cats) {
+    const r = S().rev;
+    const secs = Engine.makeDrill(items, { cats, dir: r.dir, order: r.order });
+    if (!secs.length) { toast('Rien à demander sur ces mots avec ces choix.'); return; }
+    startPaper(items, { secs, drill: true, mode: r.ans || 'type', timer: 0 });
+  }
   function startRevision() {
+    if (S().rev.mode === 'full') { startDrill(drillItems(S().rev), drillCats(S().rev)); return; }
     const r = S().rev, cards = Engine.cards(Engine.itemsFor(sel()), r);
     let list = Engine.selectCards(cards, r.which);
     if (!list.length) { toast(r.which === 'due' ? 'Rien à revoir aujourd\'hui. Choisis « Tous les mots » ou un autre groupe.' : 'Aucune carte dans ce groupe.', 3800); return; }
@@ -287,7 +329,7 @@
       if (c.kind === 'arfr' && it.t === 'verb' && it.mud) h += `<div class="sub">${ar(it.mud, 'md')}</div>`;
       if (c.kind === 'frar') h += `<div class="sub muted">${esc(T[it.t] ? T[it.t].label : '')}</div>`;
       if (/^prep/.test(c.kind)) h += `<div class="sub muted">${it.prepFr ? 'sens : ' + esc(it.prepFr) : esc(it.fr || '')}</div>`;
-      return h + `<div class="ask">${c.a.map(f => esc(F[f].fr)).join(' · ')} ?</div>`;
+      return h + `<div class="ask">${c.a.map(f => `<b>${esc(f === 'w' && c.p[0] === 'pl' ? 'Singulier' : (ASKQ[f] || F[f].fr))}</b>`).join('')}<span>?</span></div>`;
     }
     if (/^prep/.test(c.kind)) {
       // préposition : le harf avec SON sens, SA phrase, puis les autres prépositions du verbe pour comparer
@@ -345,7 +387,7 @@
     Store.grade(c.id, g); V.n++;
     if (g >= 3) FX.sound.ok(); else if (g === 1) FX.sound.bad();
     const x = g >= 3 ? 2 : 1; V.xp += x; gain(x, false);
-    if (g <= 2) Store.markHard(c.item.id);
+    if (g <= 2) Store.markHard(c.item.id); else Store.markOk(c.item.id);
     V.i++; V.flip = false; render();
   }
   function cram(know) {
@@ -378,8 +420,8 @@
   }
 
   /* ----- Examen blanc : une vraie copie en plusieurs parties ----- */
-  const SEC_ICON = { tr: 'globe', conj: 'repeat', pl: 'plural', antsyn: 'swap', prep: 'link', sent: 'book' };
-  const SEC_CATS = { tr: { tr: true }, conj: { conj: true }, pl: { pl: true }, antsyn: { ant: true, syn: true }, prep: { prep: true }, sent: { tr: true } };
+  const SEC_ICON = { tr: 'globe', conj: 'repeat', pl: 'plural', antsyn: 'swap', ant: 'swap', syn: 'equal', prep: 'link', sent: 'book' };
+  const SEC_CATS = { tr: { tr: true }, conj: { conj: true }, pl: { pl: true }, antsyn: { ant: true, syn: true }, ant: { ant: true }, syn: { syn: true }, prep: { prep: true }, sent: { tr: true } };
   const lvlName = () => ({ none: 'souple (lettres seulement)', mudari: 'voyelle du muḍāriʿ exigée', strict: 'toutes les harakat' }[S().settings.harakat]);
   const fmtNote = n => (Math.round(n * 2) / 2).toLocaleString(I18N.loc());
   const mention = n => (n >= 16 ? 'Excellent' : n >= 14 ? 'Très bien' : n >= 12 ? 'Bien' : n >= 10 ? 'Assez bien' : 'À retravailler');
@@ -414,10 +456,10 @@
   };
   function startPaper(items, opts = {}) {
     const p = S().paper;
-    const secs = Engine.makePaper(items || Engine.itemsFor(sel()), { sections: opts.sections || p.sections, size: opts.size || p.size, order: p.order || 'random' });
+    const secs = opts.secs || Engine.makePaper(items || Engine.itemsFor(sel()), { sections: opts.sections || p.sections, size: opts.size || p.size, order: p.order || 'random' });
     if (!secs.length) { toast('Pas assez de mots pour ces parties.'); return; }
     const answered = () => Object.keys(V.ans).filter(q => Object.values(V.ans[q]).some(v => v)).length;
-    go('paper', { secs, si: 0, ans: {}, answered, mode: opts.mode || p.mode, level: S().settings.harakat, t0: Date.now(), limit: (opts.timer ?? p.timer) * 60000, done: false });
+    go('paper', { secs, si: 0, ans: {}, answered, mode: opts.mode || p.mode, level: S().settings.harakat, t0: Date.now(), limit: (opts.timer ?? p.timer) * 60000, done: false, drill: !!opts.drill });
     if (V.limit) timer = setInterval(paperTick, 1000);
   }
   function paperTick() {
@@ -488,7 +530,7 @@
     const ok = secs.reduce((a, s) => a + s.ok, 0), tot = secs.reduce((a, s) => a + s.tot, 0);
     const note = tot ? ok / tot * 20 : 0;
     V.result = { secs, note, ok, tot, time: Date.now() - V.t0 };
-    S().exams.push({ at: Date.now(), center: S().center, note: Math.round(note * 10) / 10, secs: Object.fromEntries(secs.map(s => [s.key, Math.round(s.pct * 100)])) });
+    if (!V.drill) S().exams.push({ at: Date.now(), center: S().center, note: Math.round(note * 10) / 10, secs: Object.fromEntries(secs.map(s => [s.key, Math.round(s.pct * 100)])) });
     gain(Math.round(ok * 1.5) + 10, false);
     V.done = true; render(); window.scrollTo(0, 0);
     later(() => { if (note >= 14) { FX.sound.win(); FX.confetti(note >= 17 ? 160 : 80); } else FX.sound.ok(); }, 200);
@@ -1672,8 +1714,16 @@
       if (!list.length) { toast('Rien à réviser ici'); return; }
       V.done = false; go('flash', { mode: 'cram', q: list, i: 0, flip: false, n: 0, xp: 0, total: list.length, known: 0, unknown: 0, seen: {} });
     },
-    planRedo: b => { const s = V.result.secs.find(x => x.key === b.dataset.k); const items = [...new Set(s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id]).filter(Boolean))]; V.done = false; startPaper(items, { sections: [s.key], size: 'all' }); },
-    redoWrong: () => { const items = [...new Set(V.result.secs.flatMap(s => s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id])).filter(Boolean))]; const secs = V.result.secs.filter(s => s.pct < 1).map(s => s.key); V.done = false; startPaper(items, { sections: secs, size: 'all' }); },
+    planRedo: b => { const s = V.result.secs.find(x => x.key === b.dataset.k); const items = [...new Set(s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id]).filter(Boolean))]; const dr = V.drill; V.done = false; if (dr) startDrill(items, [s.key]); else startPaper(items, { sections: [s.key], size: 'all' }); },
+    redoWrong: () => { const items = [...new Set(V.result.secs.flatMap(s => s.qs.filter(x => !x.ok).map(x => LIB.items[x.q.item.id])).filter(Boolean))]; const secs = V.result.secs.filter(s => s.pct < 1).map(s => s.key); const dr = V.drill; V.done = false; if (dr) startDrill(items, secs); else startPaper(items, { sections: secs, size: 'all' }); },
+    togWeak: b => { const id = b.dataset.id; WOPEN.has(id) ? WOPEN.delete(id) : WOPEN.add(id); FX.sound.tap(); render(); },
+    reviseWeak: b => {
+      const d = centerDecks().find(x => x.id === b.dataset.id); if (!d) return;
+      const items = Engine.weakItems([...new Map(d.lessons.flatMap(l => l.items).map(it => [it.id, it])).values()]);
+      const list = Engine.shuffle(Engine.cards(items, { dir: 'both', what: { tr: true, conj: true, pl: true, ant: true, syn: true, prep: true } }));
+      if (!list.length) { toast('Rien à réviser ici'); return; }
+      go('flash', { mode: 'cram', q: list, i: 0, flip: false, n: 0, xp: 0, total: list.length, known: 0, unknown: 0, seen: {} });
+    },
     gameOpt: b => { S().game[b.dataset.k] = parseV(b.dataset.v); Store.save(); render(); },
     // mots
     openLesson: b => go('words', { lesson: b.dataset.id }),

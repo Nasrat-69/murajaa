@@ -7,7 +7,7 @@ const Store = (() => {
     v: 1, name: '', updatedAt: 0, center: 'ibaanah',
     settings: { harakat: 'none', newPerDay: 20, theme: 'auto', osk: false, sound: true, goal: 60, lang: (navigator.language || 'fr').slice(0, 2) === 'ru' ? 'ru' : (navigator.language || 'fr').slice(0, 2) === 'en' ? 'en' : 'fr' },
     exam: { n: 15, mode: 'qcm', boss: false },
-    rev: { mode: 'flip', which: 'due', order: 'random', dir: 'both', n: 20, what: { tr: true, conj: true, pl: true, ant: false, syn: false, prep: false } },
+    rev: { mode: 'flip', which: 'due', order: 'random', dir: 'both', n: 20, ans: 'type', what: { tr: true, conj: true, pl: true, ant: false, syn: false, prep: false } },
     game: { what: { tr: true, conj: true, pl: true, ant: true, syn: true, prep: true }, dur: 15, choices: 4, n: 10, speed: 'normal' },
     live: { n: 10, mode: 'qcm', time: 30, adv: 'auto', which: 'all', order: 'random', dir: 'both', what: { tr: true, conj: true, pl: true, ant: false, syn: false, prep: false } },
     paper: { sections: ['tr', 'conj', 'pl', 'antsyn', 'prep', 'sent'], size: 8, mode: 'type', timer: 0, order: 'random' },
@@ -134,6 +134,7 @@ const Store = (() => {
   // résultat d'examen / jeu : statistiques + une erreur ramène le mot en révision
   // « À revoir » / « Difficile » : le mot va dans la liste des mots difficiles
   function markHard(itemId) { const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 }); r.err++; save(); }
+  function markOk(itemId) { const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 }); r.ok++; save(); }
   function answer(itemId, ok) {
     const r = (S.items[itemId] = S.items[itemId] || { ok: 0, err: 0 });
     const d = dayRec(); d.n++;
@@ -148,6 +149,6 @@ const Store = (() => {
   load();
   return {
     get S() { return S; }, set S(v) { S = v; }, set onSave(f) { onSave = f; },
-    save, saveNow, load, defaults, normalize, merge, replace, today, addXP, streak, bestStreak, level, newToday, grade, preview, answer, markHard, KEY
+    save, saveNow, load, defaults, normalize, merge, replace, today, addXP, streak, bestStreak, level, newToday, grade, preview, answer, markHard, markOk, KEY
   };
 })();
